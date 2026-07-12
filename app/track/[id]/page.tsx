@@ -50,7 +50,7 @@ export default function TrackOrderPage() {
 
       <div className="card p-6 mb-6">
         <div className="flex items-center gap-2 bg-saffron-50 text-saffron-700 rounded-xl px-4 py-3 mb-8 text-sm font-medium">
-          <Clock size={18} /> Estimated delivery: 30-45 minutes from order confirmation
+          <Clock size={18} /> Estimated delivery: 10 minutes from order confirmation
         </div>
 
         <div className="relative">

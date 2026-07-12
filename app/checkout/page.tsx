@@ -7,7 +7,7 @@ import clsx from "clsx";
 import { useCartStore } from "@/store/useCartStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useOrderStore } from "@/store/useOrderStore";
-import { deliverySlots, pincodeServiceability } from "@/lib/data";
+import { deliverySlots, storeConfig } from "@/lib/data";
 import PaymentModal, { PaymentMethod } from "@/components/PaymentModal";
 import { toast } from "sonner";
 
@@ -64,9 +64,9 @@ export default function CheckoutPage() {
     toast.success("Address added");
   };
 
-  const handlePaymentSuccess = (method: PaymentMethod) => {
+  const handlePaymentSuccess = async (method: PaymentMethod) => {
     const methodLabel = { upi: "UPI", card: "Card", wallet: "Wallet", cod: "Cash on Delivery" }[method];
-    const order = placeOrder({
+    const order = await placeOrder({
       items,
       subtotal,
       deliveryFee,
@@ -136,7 +136,7 @@ export default function CheckoutPage() {
                   rows={2}
                 />
                 <input
-                  placeholder="Pincode"
+                  placeholder="Flat / Tower No. (e.g. Tower 4, Flat 302)"
                   value={newAddress.pincode}
                   onChange={(e) => setNewAddress({ ...newAddress, pincode: e.target.value })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-400"
@@ -148,9 +148,9 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {selectedAddress && pincodeServiceability[selectedAddress.pincode] && (
+            {selectedAddress && (
               <div className="mt-3 flex items-center gap-2 text-xs text-leaf-700 bg-leaf-50 rounded-lg px-3 py-2">
-                <CheckCircle2 size={14} /> Deliverable in {pincodeServiceability[selectedAddress.pincode].deliveryMins}
+                <CheckCircle2 size={14} /> Deliverable in {storeConfig.deliveryMinutes}
               </div>
             )}
           </div>

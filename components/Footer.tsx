@@ -14,7 +14,7 @@ export default function Footer() {
           </div>
           <p className="text-sm text-leaf-200">
             Your trusted neighbourhood kirana store, now online. Fresh
-            groceries delivered in 10-15 minutes, every single day.
+            groceries delivered in 10 minutes, every single day.
           </p>
           <div className="flex gap-3 mt-4">
             <Facebook size={18} className="cursor-pointer hover:text-saffron-400" />
@@ -48,9 +48,9 @@ export default function Footer() {
         <div>
           <h4 className="font-semibold mb-3">Get in Touch</h4>
           <ul className="space-y-3 text-sm text-leaf-200">
-            <li className="flex items-center gap-2"><Phone size={16} /> +91 98765 43210</li>
+            <li className="flex items-center gap-2"><Phone size={16} /> +91 99588 82260</li>
             <li className="flex items-center gap-2"><Mail size={16} /> support@ananyastore.in</li>
-            <li className="flex items-center gap-2"><MapPin size={16} /> Sector Alpha-2, Greater Noida, UP</li>
+            <li className="flex items-center gap-2"><MapPin size={16} /> Parsvnath Edens, Alpha-2, Greater Noida</li>
           </ul>
         </div>
       </div>

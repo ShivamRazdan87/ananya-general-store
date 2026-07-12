@@ -36,7 +36,7 @@ export default function Navbar() {
         <div className="container-x flex items-center justify-center gap-2 py-1.5">
           <Clock size={14} />
           <span className="font-medium">
-            Delivering groceries in 30-45 mins across your city!
+            Delivering groceries in 10 mins, exclusively for Parsvnath Edens!
           </span>
         </div>
       </div>

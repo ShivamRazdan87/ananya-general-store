@@ -27,10 +27,10 @@ export default function ContactPage() {
       <div className="grid md:grid-cols-2 gap-10 max-w-5xl mx-auto">
         <div className="space-y-5">
           {[
-            { icon: Phone, title: "Call Us", desc: "+91 98765 43210", sub: "Mon-Sun, 8 AM - 11 PM" },
+            { icon: Phone, title: "Call Us", desc: "+91 99588 82260", sub: "Mon-Sun, 8 AM - 11 PM" },
             { icon: Mail, title: "Email Us", desc: "support@ananyastore.in", sub: "We reply within 24 hours" },
-            { icon: MapPin, title: "Visit Us", desc: "Sector 18, Noida, UP", sub: "Our flagship store" },
-            { icon: Clock, title: "Delivery Hours", desc: "8:00 AM - 11:00 PM", sub: "30-45 minutes delivery" },
+            { icon: MapPin, title: "Visit Us", desc: "Parsvnath Edens, Alpha-2, Greater Noida", sub: "Our flagship store" },
+            { icon: Clock, title: "Delivery Hours", desc: "8:00 AM - 11:00 PM", sub: "10 minutes delivery" },
           ].map((item, i) => (
             <div key={i} className="card p-4 flex items-center gap-4">
               <div className="w-11 h-11 rounded-full bg-saffron-100 flex items-center justify-center shrink-0">

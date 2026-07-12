@@ -192,7 +192,7 @@ function AddressesTab({
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
           />
           <input
-            placeholder="Pincode"
+            placeholder="Flat / Tower No. (e.g. Tower 4, Flat 302)"
             value={form.pincode}
             onChange={(e) => setForm({ ...form, pincode: e.target.value })}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
 import {
   Clock,
   Truck,
@@ -10,29 +9,14 @@ import {
   Percent,
   MapPin,
   CheckCircle2,
-  XCircle,
   ArrowRight,
 } from "lucide-react";
-import { categories } from "@/lib/data";
+import { categories, storeConfig } from "@/lib/data";
 import { useProductStore } from "@/store/useProductStore";
 import ProductCard from "@/components/ProductCard";
-import { pincodeServiceability } from "@/lib/data";
 
 export default function HomePage() {
   const products = useProductStore((s) => s.products);
-  const [pincode, setPincode] = useState("");
-  const [result, setResult] = useState<null | { ok: boolean; area?: string; mins?: string }>(
-    null
-  );
-
-  const checkPincode = () => {
-    const info = pincodeServiceability[pincode.trim()];
-    if (info) {
-      setResult({ ok: true, area: info.area, mins: info.deliveryMins });
-    } else {
-      setResult({ ok: false });
-    }
-  };
 
   const featured = products.slice(0, 8);
   const bestDeals = [...products].sort((a, b) => (b.mrp - b.price) - (a.mrp - a.price)).slice(0, 8);
@@ -44,7 +28,7 @@ export default function HomePage() {
         <div className="container-x py-10 md:py-16 grid md:grid-cols-2 gap-8 items-center">
           <div className="animate-fade-in">
             <span className="inline-flex items-center gap-2 bg-leaf-100 text-leaf-700 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
-              <Clock size={14} /> Delivery in 30-45 minutes
+              <Clock size={14} /> Delivery in 10 minutes
             </span>
             <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">
               Your Kirana Store,
@@ -53,7 +37,7 @@ export default function HomePage() {
             </h1>
             <p className="text-gray-600 mt-4 text-lg max-w-md">
               Fresh groceries, snacks & daily essentials delivered to your
-              doorstep in just 30-45 minutes. Quality you trust, speed you love.
+              doorstep in just 10 minutes. Quality you trust, speed you love.
             </p>
             <div className="flex flex-wrap gap-3 mt-7">
               <Link href="/shop" className="btn-primary px-7 py-3.5 flex items-center gap-2 text-base">
@@ -80,7 +64,7 @@ export default function HomePage() {
       <section className="bg-white border-y border-orange-100">
         <div className="container-x py-6 grid grid-cols-2 md:grid-cols-4 gap-6">
           {[
-            { icon: Truck, title: "30-45 Min Delivery", desc: "Lightning-fast doorstep delivery" },
+            { icon: Truck, title: "10 Min Delivery", desc: "Lightning-fast doorstep delivery" },
             { icon: ShieldCheck, title: "Quality Assured", desc: "Fresh, checked & verified" },
             { icon: Percent, title: "Best Prices", desc: "Great deals every day" },
             { icon: Clock, title: "Open Till Late", desc: "8 AM - 11 PM, all days" },
@@ -98,51 +82,26 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pincode Checker */}
+      {/* Delivery Zone Banner */}
       <section id="pincode" className="container-x py-10">
         <div className="bg-leaf-800 rounded-3xl p-6 md:p-10 text-white grid md:grid-cols-2 gap-6 items-center">
           <div>
+            <span className="inline-flex items-center gap-2 bg-leaf-700/60 text-leaf-100 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
+              <MapPin size={14} /> Exclusively serving our home society
+            </span>
             <h2 className="text-2xl md:text-3xl font-bold mb-2">
-              Check delivery at your location
+              {storeConfig.societyName}
             </h2>
             <p className="text-leaf-200 text-sm mb-5">
-              Enter your pincode to see if we deliver to you in 30-45 minutes.
-              Try: 110001, 400001, 560001
+              {storeConfig.societyArea}
             </p>
-            <div className="flex gap-2 max-w-sm">
-              <input
-                type="text"
-                value={pincode}
-                onChange={(e) => setPincode(e.target.value)}
-                placeholder="Enter 6-digit pincode"
-                maxLength={6}
-                className="flex-1 rounded-xl px-4 py-3 text-gray-800 outline-none"
-              />
-              <button
-                onClick={checkPincode}
-                className="btn-primary px-5 py-3 whitespace-nowrap"
-              >
-                Check
-              </button>
-            </div>
-            {result && (
-              <div className="mt-4 animate-fade-in">
-                {result.ok ? (
-                  <div className="flex items-center gap-2 bg-leaf-700/60 rounded-xl px-4 py-3">
-                    <CheckCircle2 className="text-green-300" size={20} />
-                    <div>
-                      <p className="font-semibold text-sm">We deliver to {result.area}!</p>
-                      <p className="text-xs text-leaf-200">Estimated delivery: {result.mins}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 bg-red-900/40 rounded-xl px-4 py-3">
-                    <XCircle className="text-red-300" size={20} />
-                    <p className="text-sm">Sorry, we don't deliver here yet. Try 110001, 400001 or 560001.</p>
-                  </div>
-                )}
+            <div className="flex items-center gap-2 bg-leaf-700/60 rounded-xl px-4 py-3 max-w-sm">
+              <CheckCircle2 className="text-green-300 shrink-0" size={20} />
+              <div>
+                <p className="font-semibold text-sm">We deliver right to your door!</p>
+                <p className="text-xs text-leaf-200">Estimated delivery: {storeConfig.deliveryMinutes}</p>
               </div>
-            )}
+            </div>
           </div>
           <div className="hidden md:block relative h-56 rounded-2xl overflow-hidden">
             <Image

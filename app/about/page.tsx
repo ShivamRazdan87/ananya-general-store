@@ -3,7 +3,7 @@ import { Heart, Users, Clock, Award } from "lucide-react";
 
 export const metadata = {
   title: "About Us | Ananya General Store",
-  description: "Learn about Ananya General Store's mission to deliver groceries in 30-45 minutes.",
+  description: "Learn about Ananya General Store's mission to deliver groceries in 10 minutes.",
 };
 
 export default function AboutPage() {
@@ -38,7 +38,7 @@ export default function AboutPage() {
             the heart of the city. Over the years, thousands of families
             trusted us for their daily grocery needs. Today, we've brought
             that same trust online — combining local expertise with
-            technology to deliver fresh groceries in just 30-45 minutes.
+            technology to deliver fresh groceries in just 10 minutes.
           </p>
           <p className="text-gray-600 leading-relaxed">
             From fresh vegetables to household essentials, we hand-pick every
@@ -51,7 +51,7 @@ export default function AboutPage() {
       <section className="bg-white py-14 border-y border-orange-100">
         <div className="container-x grid grid-cols-2 md:grid-cols-4 gap-6">
           {[
-            { icon: Clock, title: "30-45 Min Delivery", desc: "Fast doorstep delivery, every time" },
+            { icon: Clock, title: "10 Min Delivery", desc: "Fast doorstep delivery, every time" },
             { icon: Heart, title: "Quality First", desc: "Hand-picked, fresh products" },
             { icon: Users, title: "10,000+ Families", desc: "Trust us for daily needs" },
             { icon: Award, title: "5+ Years", desc: "Serving our community" },

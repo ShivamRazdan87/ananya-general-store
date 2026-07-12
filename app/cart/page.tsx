@@ -34,7 +34,7 @@ export default function CartPage() {
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-3">
           <div className="bg-leaf-50 border border-leaf-100 rounded-xl p-3 flex items-center gap-2 text-sm text-leaf-800">
-            <Clock size={16} /> Your order will arrive in 30-45 minutes
+            <Clock size={16} /> Your order will arrive in 10 minutes
           </div>
           {items.map(({ product, quantity }) => (
             <div key={product.id} className="card flex items-center gap-4 p-4">

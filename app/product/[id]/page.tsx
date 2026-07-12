@@ -93,7 +93,7 @@ export default function ProductDetailPage() {
 
           <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 flex items-center gap-2 mt-5 text-sm">
             <Truck size={18} className="text-saffron-600" />
-            <span className="font-medium">Delivery in 30-45 minutes</span>
+            <span className="font-medium">Delivery in 10 minutes</span>
           </div>
 
           <p className="text-gray-600 text-sm leading-relaxed mt-5">{product.description}</p>

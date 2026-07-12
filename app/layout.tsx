@@ -4,11 +4,12 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Toaster } from "sonner";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import StoreSync from "@/components/StoreSync";
 
 export const metadata: Metadata = {
-  title: "Ananya General Store | Groceries Delivered in 30-45 mins",
+  title: "Ananya General Store | Groceries Delivered in 10 mins",
   description:
-    "Your neighbourhood kirana store online. Fresh groceries, snacks, household essentials & more delivered to your doorstep in 30-45 minutes.",
+    "Your neighbourhood kirana store online. Fresh groceries, snacks, household essentials & more delivered to your doorstep in 10 minutes.",
   keywords: [
     "grocery delivery",
     "kirana store",
@@ -25,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen flex flex-col antialiased text-gray-800">
+        <StoreSync />
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer />

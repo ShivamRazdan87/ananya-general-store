@@ -48,8 +48,8 @@ export const useAuthStore = create<AuthState>()(
                 {
                   id: "addr1",
                   label: "Home",
-                  fullAddress: "B-42, Green Park Extension, New Delhi",
-                  pincode: "110001",
+                  fullAddress: "Tower 3, Flat 205, Parsvnath Edens, Alpha-2, Greater Noida",
+                  pincode: "201308",
                   isDefault: true,
                 },
               ],

@@ -58,22 +58,20 @@ export const products: Product[] = [
   { id: "p28", name: "Cadbury Dairy Milk", category: "snacks", subCategory: "Chocolates", brand: "Cadbury", price: 45, mrp: 50, unit: "55 g", image: "https://images.unsplash.com/photo-1511381939415-e44015466834?w=400", rating: 4.7, reviewCount: 2900, stock: 260, description: "Smooth, creamy milk chocolate - a treat for every mood.", tags: ["snack", "chocolate"], isVeg: true },
 ];
 
+// Ananya General Store delivers only within its home society.
+// The store owner can widen this later, but for now it's a single, fixed zone.
+export const storeConfig = {
+  storeName: "Ananya General Store",
+  ownerWhatsApp: "919958882260", // digits only, country code first, no + or spaces
+  societyName: "Parsvnath Edens",
+  societyArea: "Alpha-2, Greater Noida",
+  deliveryMinutes: "10 mins",
+};
+
 export const pincodeServiceability: Record<string, { area: string; deliveryMins: string }> = {
-  "110001": { area: "Connaught Place, New Delhi", deliveryMins: "30-45 mins" },
-  "400001": { area: "Fort, Mumbai", deliveryMins: "30-45 mins" },
-  "560001": { area: "MG Road, Bengaluru", deliveryMins: "35-50 mins" },
-  "700001": { area: "BBD Bagh, Kolkata", deliveryMins: "40-55 mins" },
-  "600001": { area: "Parrys, Chennai", deliveryMins: "35-50 mins" },
-  "201301": { area: "Sector 18, Noida", deliveryMins: "25-40 mins" },
-  "500001": { area: "Abids, Hyderabad", deliveryMins: "30-45 mins" },
-  "411001": { area: "Camp, Pune", deliveryMins: "30-45 mins" },
+  "201308": { area: `${storeConfig.societyName}, ${storeConfig.societyArea}`, deliveryMins: storeConfig.deliveryMinutes },
 };
 
 export const deliverySlots = [
-  { id: "asap", label: "ASAP (30-45 mins)", day: "Today" },
-  { id: "today-6-8", label: "6:00 PM - 8:00 PM", day: "Today" },
-  { id: "today-8-10", label: "8:00 PM - 10:00 PM", day: "Today" },
-  { id: "tom-8-10", label: "8:00 AM - 10:00 AM", day: "Tomorrow" },
-  { id: "tom-10-12", label: "10:00 AM - 12:00 PM", day: "Tomorrow" },
-  { id: "tom-4-6", label: "4:00 PM - 6:00 PM", day: "Tomorrow" },
+  { id: "asap", label: "ASAP (10 mins)", day: "Today" },
 ];

@@ -26,7 +26,79 @@ complete admin panel with analytics.
 
 ---
 
-## 🔑 Demo Credentials
+## 🏘️ Single-Society Store Setup
+
+This build is configured for **Ananya General Store**, delivering exclusively
+within **Parsvnath Edens, Alpha-2, Greater Noida**, with **10-minute delivery**.
+
+To change the store name, society, or WhatsApp number, edit `lib/data.ts`:
+
+```ts
+export const storeConfig = {
+  storeName: "Ananya General Store",
+  ownerWhatsApp: "919958882260", // digits only, country code first, no + or spaces
+  societyName: "Parsvnath Edens",
+  societyArea: "Alpha-2, Greater Noida",
+  deliveryMinutes: "10 mins",
+};
+```
+
+## 📲 WhatsApp Order Alerts
+
+After a customer's order is confirmed, the order confirmation page shows a
+**"Confirm order with shop on WhatsApp"** button. Tapping it opens WhatsApp
+with a pre-filled message (order ID, items, total, delivery address) addressed
+to `storeConfig.ownerWhatsApp` — so the shop owner gets notified instantly with
+zero backend needed. This works today, with no further setup.
+
+## 🗄️ Real Shared Backend (Supabase) — Recommended for real use
+
+By default, this app stores products/orders in each visitor's own browser
+(localStorage) — fine for a demo, but for a real store, **the owner needs to
+see every customer's orders**, and every customer needs to see the same
+product catalog. Follow these steps to enable real, shared data:
+
+### 1. Create a free Supabase project
+Go to **https://supabase.com** → Sign up → "New Project". Pick any name/region,
+set a database password, and wait ~2 minutes for it to provision.
+
+### 2. Run the database schema
+In your Supabase project → **SQL Editor** → **New Query** → paste the entire
+contents of `supabase-schema.sql` (included in this project) → click **Run**.
+This creates the `products` and `orders` tables.
+
+### 3. Get your API credentials
+In Supabase → **Project Settings** → **API**, copy:
+- **Project URL**
+- **anon public** key
+
+### 4. Add them as environment variables
+
+**Locally**, create a file named `.env.local` in the project root:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+**On Vercel** (for your live site): go to your Vercel project → **Settings** →
+**Environment Variables** → add both `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` with the same values → **Save** → then
+**redeploy** (Deployments tab → "..." → Redeploy) so the live site picks them up.
+
+### That's it
+Once those env vars are set, the app automatically:
+- Loads the shared product catalog from Supabase (and seeds it with the
+  starter catalog the very first time, if the table is empty)
+- Saves every order to Supabase, so the Admin panel shows **every customer's
+  order**, not just orders placed in one browser
+- Products added/edited/deleted in the Admin panel sync for all visitors
+
+If these env vars are **not** set, the app still works exactly as before
+(local-only demo mode) — nothing breaks either way.
+
+---
+
+
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -35,8 +107,9 @@ complete admin panel with analytics.
 
 You can also register a new customer account — it's stored in `localStorage`.
 
-### Sample serviceable pincodes
-`110001`, `400001`, `560001`, `700001`, `600001`, `201301`, `500001`, `411001`
+### Delivery zone
+This store now serves a single society only: **Parsvnath Edens, Alpha-2, Greater Noida**.
+See "Single-Society Store Setup" below to change this.
 
 ---
 
