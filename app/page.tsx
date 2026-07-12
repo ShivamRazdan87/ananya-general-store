@@ -1,0 +1,208 @@
+"use client";
+
+import Link from "next/link";
+import Image from "next/image";
+import { useState } from "react";
+import {
+  Clock,
+  Truck,
+  ShieldCheck,
+  Percent,
+  MapPin,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+} from "lucide-react";
+import { categories } from "@/lib/data";
+import { useProductStore } from "@/store/useProductStore";
+import ProductCard from "@/components/ProductCard";
+import { pincodeServiceability } from "@/lib/data";
+
+export default function HomePage() {
+  const products = useProductStore((s) => s.products);
+  const [pincode, setPincode] = useState("");
+  const [result, setResult] = useState<null | { ok: boolean; area?: string; mins?: string }>(
+    null
+  );
+
+  const checkPincode = () => {
+    const info = pincodeServiceability[pincode.trim()];
+    if (info) {
+      setResult({ ok: true, area: info.area, mins: info.deliveryMins });
+    } else {
+      setResult({ ok: false });
+    }
+  };
+
+  const featured = products.slice(0, 8);
+  const bestDeals = [...products].sort((a, b) => (b.mrp - b.price) - (a.mrp - a.price)).slice(0, 8);
+
+  return (
+    <div>
+      {/* Hero */}
+      <section className="bg-gradient-to-br from-saffron-50 via-white to-leaf-50 overflow-hidden">
+        <div className="container-x py-10 md:py-16 grid md:grid-cols-2 gap-8 items-center">
+          <div className="animate-fade-in">
+            <span className="inline-flex items-center gap-2 bg-leaf-100 text-leaf-700 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
+              <Clock size={14} /> Delivery in 30-45 minutes
+            </span>
+            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">
+              Your Kirana Store,
+              <br />
+              <span className="text-saffron-600">Now Online.</span>
+            </h1>
+            <p className="text-gray-600 mt-4 text-lg max-w-md">
+              Fresh groceries, snacks & daily essentials delivered to your
+              doorstep in just 30-45 minutes. Quality you trust, speed you love.
+            </p>
+            <div className="flex flex-wrap gap-3 mt-7">
+              <Link href="/shop" className="btn-primary px-7 py-3.5 flex items-center gap-2 text-base">
+                Start Shopping <ArrowRight size={18} />
+              </Link>
+              <Link href="#pincode" className="btn-secondary px-7 py-3.5 flex items-center gap-2 text-base">
+                <MapPin size={18} /> Check Delivery
+              </Link>
+            </div>
+          </div>
+          <div className="relative h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl animate-fade-in">
+            <Image
+              src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=900"
+              alt="Fresh groceries"
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* USP Strip */}
+      <section className="bg-white border-y border-orange-100">
+        <div className="container-x py-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+          {[
+            { icon: Truck, title: "30-45 Min Delivery", desc: "Lightning-fast doorstep delivery" },
+            { icon: ShieldCheck, title: "Quality Assured", desc: "Fresh, checked & verified" },
+            { icon: Percent, title: "Best Prices", desc: "Great deals every day" },
+            { icon: Clock, title: "Open Till Late", desc: "8 AM - 11 PM, all days" },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-saffron-100 flex items-center justify-center shrink-0">
+                <item.icon size={20} className="text-saffron-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">{item.title}</p>
+                <p className="text-xs text-gray-500">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Pincode Checker */}
+      <section id="pincode" className="container-x py-10">
+        <div className="bg-leaf-800 rounded-3xl p-6 md:p-10 text-white grid md:grid-cols-2 gap-6 items-center">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold mb-2">
+              Check delivery at your location
+            </h2>
+            <p className="text-leaf-200 text-sm mb-5">
+              Enter your pincode to see if we deliver to you in 30-45 minutes.
+              Try: 110001, 400001, 560001
+            </p>
+            <div className="flex gap-2 max-w-sm">
+              <input
+                type="text"
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value)}
+                placeholder="Enter 6-digit pincode"
+                maxLength={6}
+                className="flex-1 rounded-xl px-4 py-3 text-gray-800 outline-none"
+              />
+              <button
+                onClick={checkPincode}
+                className="btn-primary px-5 py-3 whitespace-nowrap"
+              >
+                Check
+              </button>
+            </div>
+            {result && (
+              <div className="mt-4 animate-fade-in">
+                {result.ok ? (
+                  <div className="flex items-center gap-2 bg-leaf-700/60 rounded-xl px-4 py-3">
+                    <CheckCircle2 className="text-green-300" size={20} />
+                    <div>
+                      <p className="font-semibold text-sm">We deliver to {result.area}!</p>
+                      <p className="text-xs text-leaf-200">Estimated delivery: {result.mins}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 bg-red-900/40 rounded-xl px-4 py-3">
+                    <XCircle className="text-red-300" size={20} />
+                    <p className="text-sm">Sorry, we don't deliver here yet. Try 110001, 400001 or 560001.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="hidden md:block relative h-56 rounded-2xl overflow-hidden">
+            <Image
+              src="https://images.unsplash.com/photo-1601599963565-b7f49deb2c98?w=800"
+              alt="Delivery"
+              fill
+              className="object-cover"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Categories */}
+      <section className="container-x py-8">
+        <h2 className="text-2xl font-bold mb-5">Shop by Category</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+          {categories.map((cat) => (
+            <Link
+              key={cat.id}
+              href={`/shop?category=${cat.id}`}
+              className="card p-4 flex flex-col items-center text-center gap-2 hover:-translate-y-1 transition"
+            >
+              <span className="text-3xl">{cat.icon}</span>
+              <span className="text-xs font-semibold">{cat.name}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Featured Products */}
+      <section className="container-x py-8">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-2xl font-bold">Popular Products</h2>
+          <Link href="/shop" className="text-saffron-600 text-sm font-semibold flex items-center gap-1">
+            View All <ArrowRight size={14} />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {featured.map((p) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
+        </div>
+      </section>
+
+      {/* Best Deals */}
+      <section className="container-x py-8 pb-16">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            🔥 Best Deals
+          </h2>
+          <Link href="/shop" className="text-saffron-600 text-sm font-semibold flex items-center gap-1">
+            View All <ArrowRight size={14} />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {bestDeals.map((p) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
