@@ -31,7 +31,7 @@ export default function HomePage() {
               <Clock size={14} /> Delivery in 10 minutes
             </span>
             <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight">
-              Your Kirana Store,
+              Ananya General Store,
               <br />
               <span className="text-saffron-600">Now Online.</span>
             </h1>
