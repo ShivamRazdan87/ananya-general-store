@@ -3,11 +3,17 @@
 @tailwind utilities;
 
 html { scroll-behavior: smooth; }
+
 body { background-color: #fffaf3; }
+
+.dark body { background-color: #030712; }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #ff9d38; border-radius: 8px; }
 ::-webkit-scrollbar-track { background: #fff8ed; }
+
+.dark ::-webkit-scrollbar-thumb { background: #c94a09; }
+.dark ::-webkit-scrollbar-track { background: #1f2937; }
 
 .line-clamp-2 {
   display: -webkit-box;
@@ -26,4 +32,7 @@ body { background-color: #fffaf3; }
 }
 .card {
   @apply bg-white rounded-2xl shadow-sm border border-orange-100 hover:shadow-xl transition-shadow duration-300;
+}
+.dark .card {
+  @apply bg-gray-800 border-gray-700;
 }

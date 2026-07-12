@@ -33,7 +33,7 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <div className="card relative group overflow-hidden flex flex-col">
       <Link href={`/product/${product.id}`} className="flex-1 flex flex-col">
-        <div className="relative h-40 sm:h-44 bg-orange-50">
+        <div className="relative h-40 sm:h-44 bg-orange-50 dark:bg-gray-700">
           <Image
             src={product.image}
             alt={product.name}
@@ -48,7 +48,7 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
           <button
             onClick={handleWishlist}
-            className="absolute top-2 right-2 bg-white/90 rounded-full p-1.5 shadow hover:scale-110 transition"
+            className="absolute top-2 right-2 bg-white/90 dark:bg-gray-800/90 rounded-full p-1.5 shadow hover:scale-110 transition"
           >
             <Heart
               size={16}
@@ -58,21 +58,21 @@ export default function ProductCard({ product }: { product: Product }) {
           </button>
         </div>
         <div className="p-3 flex-1 flex flex-col">
-          <p className="text-[11px] text-gray-400 font-medium">{product.brand}</p>
-          <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 mt-0.5">
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">{product.brand}</p>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 line-clamp-2 mt-0.5">
             {product.name}
           </h3>
-          <p className="text-xs text-gray-400 mt-1">{product.unit}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{product.unit}</p>
           <div className="flex items-center gap-1 mt-1">
             <div className="flex items-center bg-leaf-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded gap-0.5">
               {product.rating} <Star size={9} fill="white" />
             </div>
-            <span className="text-[11px] text-gray-400">({product.reviewCount})</span>
+            <span className="text-[11px] text-gray-400 dark:text-gray-500">({product.reviewCount})</span>
           </div>
           <div className="flex items-baseline gap-2 mt-2">
-            <span className="font-bold text-gray-900">₹{product.price}</span>
+            <span className="font-bold text-gray-900 dark:text-gray-100">₹{product.price}</span>
             {product.mrp > product.price && (
-              <span className="text-xs text-gray-400 line-through">₹{product.mrp}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 line-through">₹{product.mrp}</span>
             )}
           </div>
         </div>

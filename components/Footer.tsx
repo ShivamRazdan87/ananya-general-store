@@ -10,7 +10,7 @@ export default function Footer() {
             <div className="w-9 h-9 rounded-full bg-saffron-500 flex items-center justify-center font-bold">
               A
             </div>
-            <span className="font-extrabold text-lg">Ananya General Store</span>
+            <span className="font-extrabold text-lg dark:text-white">Ananya General Store</span>
           </div>
           <p className="text-sm text-leaf-200">
             Your trusted neighbourhood kirana store, now online. Fresh

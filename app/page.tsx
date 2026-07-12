@@ -24,18 +24,18 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-saffron-50 via-white to-leaf-50 overflow-hidden">
+      <section className="bg-gradient-to-br from-saffron-50 via-white to-leaf-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 overflow-hidden">
         <div className="container-x py-10 md:py-16 grid md:grid-cols-2 gap-8 items-center">
           <div className="animate-fade-in">
-            <span className="inline-flex items-center gap-2 bg-leaf-100 text-leaf-700 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
+            <span className="inline-flex items-center gap-2 bg-leaf-100 dark:bg-leaf-800 text-leaf-700 dark:text-leaf-200 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
               <Clock size={14} /> Delivery in 10 minutes
             </span>
-            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">
+            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight">
               Your Kirana Store,
               <br />
               <span className="text-saffron-600">Now Online.</span>
             </h1>
-            <p className="text-gray-600 mt-4 text-lg max-w-md">
+            <p className="text-gray-600 dark:text-gray-300 mt-4 text-lg max-w-md">
               Fresh groceries, snacks & daily essentials delivered to your
               doorstep in just 10 minutes. Quality you trust, speed you love.
             </p>
@@ -61,7 +61,7 @@ export default function HomePage() {
       </section>
 
       {/* USP Strip */}
-      <section className="bg-white border-y border-orange-100">
+      <section className="bg-white dark:bg-gray-900 border-y border-orange-100 dark:border-gray-800">
         <div className="container-x py-6 grid grid-cols-2 md:grid-cols-4 gap-6">
           {[
             { icon: Truck, title: "10 Min Delivery", desc: "Lightning-fast doorstep delivery" },
@@ -70,12 +70,12 @@ export default function HomePage() {
             { icon: Clock, title: "Open Till Late", desc: "8 AM - 11 PM, all days" },
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-saffron-100 flex items-center justify-center shrink-0">
-                <item.icon size={20} className="text-saffron-600" />
+              <div className="w-11 h-11 rounded-full bg-saffron-100 dark:bg-saffron-900 flex items-center justify-center shrink-0">
+                <item.icon size={20} className="text-saffron-600 dark:text-saffron-400" />
               </div>
               <div>
-                <p className="font-semibold text-sm">{item.title}</p>
-                <p className="text-xs text-gray-500">{item.desc}</p>
+                <p className="font-semibold text-sm dark:text-gray-100">{item.title}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
               </div>
             </div>
           ))}
@@ -116,7 +116,7 @@ export default function HomePage() {
 
       {/* Categories */}
       <section className="container-x py-8">
-        <h2 className="text-2xl font-bold mb-5">Shop by Category</h2>
+        <h2 className="text-2xl font-bold dark:text-white mb-5">Shop by Category</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
           {categories.map((cat) => (
             <Link
@@ -125,7 +125,7 @@ export default function HomePage() {
               className="card p-4 flex flex-col items-center text-center gap-2 hover:-translate-y-1 transition"
             >
               <span className="text-3xl">{cat.icon}</span>
-              <span className="text-xs font-semibold">{cat.name}</span>
+              <span className="text-xs font-semibold dark:text-gray-200">{cat.name}</span>
             </Link>
           ))}
         </div>
@@ -134,7 +134,7 @@ export default function HomePage() {
       {/* Featured Products */}
       <section className="container-x py-8">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-2xl font-bold">Popular Products</h2>
+          <h2 className="text-2xl font-bold dark:text-white">Popular Products</h2>
           <Link href="/shop" className="text-saffron-600 text-sm font-semibold flex items-center gap-1">
             View All <ArrowRight size={14} />
           </Link>
@@ -149,7 +149,7 @@ export default function HomePage() {
       {/* Best Deals */}
       <section className="container-x py-8 pb-16">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-2xl font-bold flex items-center gap-2">
+          <h2 className="text-2xl font-bold dark:text-white flex items-center gap-2">
             🔥 Best Deals
           </h2>
           <Link href="/shop" className="text-saffron-600 text-sm font-semibold flex items-center gap-1">
