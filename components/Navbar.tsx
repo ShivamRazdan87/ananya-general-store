@@ -12,11 +12,13 @@ import {
   X,
   MapPin,
   Clock,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { useWishlistStore } from "@/store/useWishlistStore";
 import { useAuthStore } from "@/store/useAuthStore";
-import ThemeToggle from "@/components/ThemeToggle";
+import { useThemeStore } from "@/store/useThemeStore";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -25,6 +27,7 @@ export default function Navbar() {
   const totalItems = useCartStore((s) => s.getTotalItems());
   const wishlistCount = useWishlistStore((s) => s.items.length);
   const { isLoggedIn, user } = useAuthStore();
+  const { isDark, toggleTheme } = useThemeStore();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +35,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white dark:bg-gray-900 dark:border-b dark:border-gray-800 shadow-sm">
+    <header className="sticky top-0 z-40 bg-white shadow-sm">
       <div className="bg-leaf-700 text-white text-xs sm:text-sm">
         <div className="container-x flex items-center justify-center gap-2 py-1.5">
           <Clock size={14} />
@@ -49,17 +52,17 @@ export default function Navbar() {
               A
             </div>
             <div className="hidden sm:block">
-              <p className="font-extrabold text-lg leading-tight text-leaf-800 dark:text-leaf-300">
+              <p className="font-extrabold text-lg leading-tight text-leaf-800">
                 Ananya
               </p>
-              <p className="text-xs text-saffron-600 dark:text-saffron-400 -mt-1 font-medium">
+              <p className="text-xs text-saffron-600 -mt-1 font-medium">
                 General Store
               </p>
             </div>
           </Link>
 
           <button
-            className="hidden md:flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 hover:border-saffron-400 transition"
+            className="hidden md:flex items-center gap-1 text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:border-saffron-400 transition"
             onClick={() => router.push("/#pincode")}
           >
             <MapPin size={16} className="text-saffron-600" />
@@ -76,11 +79,11 @@ export default function Navbar() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search for atta, rice, oil, snacks..."
-              className="bg-transparent outline-none w-full text-sm dark:text-gray-100 dark:placeholder-gray-500"
+              className="bg-transparent outline-none w-full text-sm"
             />
           </form>
 
-          <nav className="hidden lg:flex items-center gap-5 text-sm font-medium shrink-0 dark:text-gray-200">
+          <nav className="hidden lg:flex items-center gap-5 text-sm font-medium shrink-0">
             <Link href="/shop" className="hover:text-saffron-600 transition">
               Shop
             </Link>
@@ -93,12 +96,22 @@ export default function Navbar() {
           </nav>
 
           <div className="flex items-center gap-3 shrink-0">
-            <ThemeToggle />
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800 transition"
+              aria-label="Toggle dark mode"
+            >
+              {isDark ? (
+                <Sun size={20} className="text-haldi-500" />
+              ) : (
+                <Moon size={20} className="text-gray-700" />
+              )}
+            </button>
             <Link
               href="/wishlist"
-              className="relative p-2 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800 transition"
+              className="relative p-2 rounded-full hover:bg-orange-50 transition"
             >
-              <Heart size={22} className="text-gray-700 dark:text-gray-200" />
+              <Heart size={22} className="text-gray-700" />
               {wishlistCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-saffron-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
                   {wishlistCount}
@@ -107,9 +120,9 @@ export default function Navbar() {
             </Link>
             <Link
               href="/cart"
-              className="relative p-2 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800 transition"
+              className="relative p-2 rounded-full hover:bg-orange-50 transition"
             >
-              <ShoppingCart size={22} className="text-gray-700 dark:text-gray-200" />
+              <ShoppingCart size={22} className="text-gray-700" />
               {totalItems > 0 && (
                 <span className="absolute -top-1 -right-1 bg-leaf-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
                   {totalItems}
@@ -118,17 +131,17 @@ export default function Navbar() {
             </Link>
             <Link
               href="/account"
-              className="p-2 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800 transition hidden sm:flex items-center gap-2"
+              className="p-2 rounded-full hover:bg-orange-50 transition hidden sm:flex items-center gap-2"
             >
-              <User size={22} className="text-gray-700 dark:text-gray-200" />
+              <User size={22} className="text-gray-700" />
               {isLoggedIn && (
-                <span className="hidden xl:inline text-sm font-medium dark:text-gray-200">
+                <span className="hidden xl:inline text-sm font-medium">
                   {user?.name.split(" ")[0]}
                 </span>
               )}
             </Link>
             <button
-              className="lg:hidden p-2 dark:text-gray-200"
+              className="lg:hidden p-2"
               onClick={() => setMenuOpen(!menuOpen)}
             >
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -138,7 +151,7 @@ export default function Navbar() {
       </div>
 
       {menuOpen && (
-        <div className="lg:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 dark:text-gray-100">
+        <div className="lg:hidden border-t border-gray-100 bg-white">
           <div className="container-x py-3 flex flex-col gap-3 text-sm font-medium">
             <Link href="/shop" onClick={() => setMenuOpen(false)}>
               Shop
