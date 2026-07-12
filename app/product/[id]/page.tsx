@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
+import ProductImage from "@/components/ProductImage";
 import Link from "next/link";
 import {
   Heart,
@@ -58,7 +58,7 @@ export default function ProductDetailPage() {
 
       <div className="grid md:grid-cols-2 gap-10">
         <div className="relative h-80 md:h-[420px] bg-orange-50 rounded-3xl overflow-hidden">
-          <Image src={product.image} alt={product.name} fill className="object-cover" priority />
+          <ProductImage src={product.image} alt={product.name} fill className="object-cover" />
           {discount > 0 && (
             <span className="absolute top-4 left-4 bg-leaf-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
               {discount}% OFF

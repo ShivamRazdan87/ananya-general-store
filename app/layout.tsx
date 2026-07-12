@@ -26,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Apply saved dark mode preference before paint, to avoid a light-mode flash */}
         <script
           dangerouslySetInnerHTML={{
             __html: `

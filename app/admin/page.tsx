@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -12,6 +12,11 @@ import {
   Trash2,
   Edit,
   X,
+  Camera,
+  Image as ImageIcon,
+  Sun,
+  PackageX,
+  PackageCheck,
 } from "lucide-react";
 import {
   BarChart,
@@ -28,6 +33,7 @@ import {
 } from "recharts";
 import clsx from "clsx";
 import { useOrderStore, OrderStatus } from "@/store/useOrderStore";
+import { uploadProductImage } from "@/lib/supabase";
 import { useProductStore } from "@/store/useProductStore";
 import { Product, categories } from "@/lib/data";
 import { toast } from "sonner";
@@ -51,8 +57,58 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [tab, setTab] = useState<"dashboard" | "orders" | "products">("dashboard");
 
-  const { orders, updateStatus } = useOrderStore();
+  const { orders, updateStatus, fetchOrders } = useOrderStore();
   const { products, addProduct, updateProduct, deleteProduct } = useProductStore();
+  const knownOrderIdsRef = useRef<Set<string> | null>(null);
+
+  // Watch for new orders while the admin panel is open, and alert with
+  // sound + vibration (phones) so the shop owner notices right away.
+  useEffect(() => {
+    if (!authed) return;
+
+    // Seed the "known orders" list once, so we only alert for orders that
+    // arrive AFTER the admin panel was opened, not the existing ones.
+    if (knownOrderIdsRef.current === null) {
+      knownOrderIdsRef.current = new Set(orders.map((o) => o.id));
+    }
+
+    const interval = setInterval(async () => {
+      await fetchOrders();
+      const latestOrders = useOrderStore.getState().orders;
+      const newOnes = latestOrders.filter((o) => !knownOrderIdsRef.current!.has(o.id));
+      if (newOnes.length > 0) {
+        newOnes.forEach((o) => knownOrderIdsRef.current!.add(o.id));
+        playNewOrderAlert();
+        toast.success(`🛒 New order received: ${newOnes[0].id}`);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [authed, fetchOrders]);
+
+  const playNewOrderAlert = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      [880, 1046].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.18);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.18);
+        osc.stop(ctx.currentTime + i * 0.18 + 0.35);
+      });
+    } catch (e) {
+      // Audio not available (e.g. blocked by browser) — silently skip
+    }
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate([200, 100, 200]);
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +125,19 @@ export default function AdminPage() {
     const totalOrders = orders.length;
     const avgOrderValue = totalOrders ? totalRevenue / totalOrders : 0;
     const pendingOrders = orders.filter((o) => o.status === "Pending").length;
-    return { totalRevenue, totalOrders, avgOrderValue, pendingOrders };
+
+    const todayStr = new Date().toDateString();
+    const todaysOrders = orders.filter((o) => new Date(o.createdAt).toDateString() === todayStr);
+    const todaysRevenue = todaysOrders.reduce((s, o) => s + o.total, 0);
+
+    return {
+      totalRevenue,
+      totalOrders,
+      avgOrderValue,
+      pendingOrders,
+      todaysOrderCount: todaysOrders.length,
+      todaysRevenue,
+    };
   }, [orders]);
 
   const revenueByDay = useMemo(() => {
@@ -157,11 +225,15 @@ export default function AdminPage() {
 
       {tab === "dashboard" && (
         <div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <StatCard icon={IndianRupee} label="Total Revenue" value={`₹${stats.totalRevenue.toFixed(0)}`} color="saffron" />
-            <StatCard icon={ShoppingBag} label="Total Orders" value={stats.totalOrders.toString()} color="leaf" />
-            <StatCard icon={TrendingUp} label="Avg. Order Value" value={`₹${stats.avgOrderValue.toFixed(0)}`} color="haldi" />
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <StatCard icon={Sun} label="Today's Orders" value={stats.todaysOrderCount.toString()} color="saffron" />
+            <StatCard icon={IndianRupee} label="Today's Revenue" value={`₹${stats.todaysRevenue.toFixed(0)}`} color="leaf" />
             <StatCard icon={Package} label="Pending Orders" value={stats.pendingOrders.toString()} color="red" />
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            <StatCard icon={IndianRupee} label="Total Revenue (all-time)" value={`₹${stats.totalRevenue.toFixed(0)}`} color="saffron" />
+            <StatCard icon={ShoppingBag} label="Total Orders (all-time)" value={stats.totalOrders.toString()} color="leaf" />
+            <StatCard icon={TrendingUp} label="Avg. Order Value" value={`₹${stats.avgOrderValue.toFixed(0)}`} color="haldi" />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
@@ -285,6 +357,8 @@ function ProductsManager({
 }) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const lastStockRef = useRef<Record<string, number>>({});
   const [form, setForm] = useState({
     name: "", category: categories[0].id, brand: "", price: "", mrp: "", unit: "", stock: "", image: "",
   });
@@ -293,6 +367,22 @@ function ProductsManager({
     setForm({ name: "", category: categories[0].id, brand: "", price: "", mrp: "", unit: "", stock: "", image: "" });
     setEditingId(null);
     setShowForm(false);
+  };
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadProductImage(file);
+      setForm((f) => ({ ...f, image: url }));
+      toast.success("Photo added");
+    } catch (err) {
+      toast.error("Couldn't upload photo, try again");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   };
 
   const handleSave = () => {
@@ -335,6 +425,18 @@ function ProductsManager({
     resetForm();
   };
 
+  const toggleStock = (p: Product) => {
+    if (p.stock > 0) {
+      lastStockRef.current[p.id] = p.stock;
+      updateProduct(p.id, { stock: 0 });
+      toast.success(`${p.name} marked out of stock`);
+    } else {
+      const restored = lastStockRef.current[p.id] || 20;
+      updateProduct(p.id, { stock: restored });
+      toast.success(`${p.name} marked back in stock (${restored})`);
+    }
+  };
+
   const startEdit = (p: Product) => {
     setForm({
       name: p.name, category: p.category, brand: p.brand, price: p.price.toString(),
@@ -359,6 +461,36 @@ function ProductsManager({
             <h4 className="font-semibold">{editingId ? "Edit Product" : "New Product"}</h4>
             <button onClick={resetForm}><X size={18} /></button>
           </div>
+
+          {/* Photo upload */}
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-20 h-20 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
+              {uploading ? (
+                <span className="text-xs text-gray-400">Uploading...</span>
+              ) : form.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.image} alt="Product" className="w-full h-full object-cover" />
+              ) : (
+                <ImageIcon size={24} className="text-gray-300" />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="btn-primary text-xs px-3 py-2 flex items-center gap-1 cursor-pointer w-fit">
+                <Camera size={14} /> Take / Choose Photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                />
+              </label>
+              <p className="text-[11px] text-gray-400">
+                On your phone, this opens the camera directly. On a computer, it opens a file picker.
+              </p>
+            </div>
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-3">
             <input placeholder="Product Name*" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <input placeholder="Brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
@@ -369,9 +501,8 @@ function ProductsManager({
             <input placeholder="Price*" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <input placeholder="MRP" type="number" value={form.mrp} onChange={(e) => setForm({ ...form, mrp: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <input placeholder="Stock" type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <input placeholder="Image URL" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
           </div>
-          <button onClick={handleSave} className="btn-primary text-sm px-5 py-2 mt-4">
+          <button onClick={handleSave} disabled={uploading} className="btn-primary text-sm px-5 py-2 mt-4 disabled:opacity-50">
             {editingId ? "Update Product" : "Add Product"}
           </button>
         </div>
@@ -399,7 +530,14 @@ function ProductsManager({
                     {p.stock > 0 ? `${p.stock} in stock` : "Out of stock"}
                   </span>
                 </td>
-                <td className="p-3 flex gap-2">
+                <td className="p-3 flex gap-2 items-center">
+                  <button
+                    onClick={() => toggleStock(p)}
+                    title={p.stock > 0 ? "Mark out of stock" : "Mark in stock"}
+                    className={p.stock > 0 ? "text-red-500 hover:text-red-700" : "text-leaf-600 hover:text-leaf-700"}
+                  >
+                    {p.stock > 0 ? <PackageX size={16} /> : <PackageCheck size={16} />}
+                  </button>
                   <button onClick={() => startEdit(p)} className="text-blue-500 hover:text-blue-700"><Edit size={16} /></button>
                   <button onClick={() => { deleteProduct(p.id); toast.success("Product deleted"); }} className="text-red-500 hover:text-red-700"><Trash2 size={16} /></button>
                 </td>
