@@ -108,6 +108,7 @@ export default function HomePage() {
               src="/society.jpg"
               alt="Delivery"
               fill
+              unoptimized
               className="object-cover"
             />
           </div>
