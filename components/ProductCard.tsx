@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import ProductImage from "@/components/ProductImage";
 import { Heart, Star, Plus, Minus } from "lucide-react";
 import { Product } from "@/lib/data";
 import { useCartStore } from "@/store/useCartStore";
@@ -34,7 +34,7 @@ export default function ProductCard({ product }: { product: Product }) {
     <div className="card relative group overflow-hidden flex flex-col">
       <Link href={`/product/${product.id}`} className="flex-1 flex flex-col">
         <div className="relative h-40 sm:h-44 bg-orange-50 dark:bg-gray-700">
-          <Image
+          <ProductImage
             src={product.image}
             alt={product.name}
             fill
