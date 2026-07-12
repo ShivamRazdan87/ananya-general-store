@@ -36,3 +36,6 @@ body { background-color: #fffaf3; }
 .dark .card {
   @apply bg-gray-800 border-gray-700;
 }
+.dark .bg-white {
+  background-color: #0f172a !important;
+}
