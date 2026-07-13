@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import { Toaster } from "sonner";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import StoreSync from "@/components/StoreSync";
+import PageTransition from "@/components/PageTransition";
 
 export const metadata: Metadata = {
   title: "Ananya General Store | Groceries Delivered in 10 mins",
@@ -44,7 +45,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col antialiased text-gray-800 dark:text-gray-100 dark:bg-gray-950 bg-white transition-colors">
         <StoreSync />
         <Navbar />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1"><PageTransition>{children}</PageTransition></main>
         <Footer />
         <WhatsAppButton />
         <Toaster position="top-center" richColors closeButton />

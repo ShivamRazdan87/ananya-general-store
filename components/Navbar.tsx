@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   ShoppingCart,
   Heart,
@@ -124,9 +125,15 @@ export default function Navbar() {
             >
               <ShoppingCart size={22} className="text-gray-700" />
               {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 bg-leaf-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                <motion.span
+                  key={totalItems}
+                  initial={{ scale: 0.4 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 12 }}
+                  className="absolute -top-1 -right-1 bg-leaf-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center"
+                >
                   {totalItems}
-                </span>
+                </motion.span>
               )}
             </Link>
             <Link

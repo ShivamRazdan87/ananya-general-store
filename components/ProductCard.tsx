@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import ProductImage from "@/components/ProductImage";
+import { motion } from "framer-motion";
 import { Heart, Star, Plus, Minus } from "lucide-react";
 import { Product } from "@/lib/data";
 import { useCartStore } from "@/store/useCartStore";
@@ -31,7 +32,11 @@ export default function ProductCard({ product }: { product: Product }) {
   };
 
   return (
-    <div className="card relative group overflow-hidden flex flex-col">
+    <motion.div
+      whileHover={{ y: -6, scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className="card relative group overflow-hidden flex flex-col"
+    >
       <Link href={`/product/${product.id}`} className="flex-1 flex flex-col">
         <div className="relative h-40 sm:h-44 bg-orange-50 dark:bg-gray-700">
           <ProductImage
@@ -80,13 +85,15 @@ export default function ProductCard({ product }: { product: Product }) {
 
       <div className="px-3 pb-3">
         {!cartItem ? (
-          <button
+          <motion.button
             onClick={handleAdd}
             disabled={product.stock === 0}
+            whileTap={{ scale: 0.88 }}
+            transition={{ type: "spring", stiffness: 400, damping: 10 }}
             className="w-full btn-primary text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
-          </button>
+          </motion.button>
         ) : (
           <div className="flex items-center justify-between bg-saffron-500 rounded-xl text-white">
             <button
@@ -111,6 +118,6 @@ export default function ProductCard({ product }: { product: Product }) {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
