@@ -14,33 +14,83 @@ export const supabase = createClient(
 );
 
 // Uploads a product photo (e.g. taken directly on the shop owner's phone)
-// to Supabase Storage and returns a public URL. Falls back to converting
-// the image to a compact base64 string if Supabase isn't configured yet,
-// so photo upload still works even before the backend is set up.
+// to Supabase Storage and returns a public URL. Photos are resized/compressed
+// first, since phone camera photos are often 3-8MB — too large for a smooth
+// upload, and prone to silently failing. Throws on real failure so the UI
+// can show an error instead of pretending it worked.
 export async function uploadProductImage(file: File): Promise<string> {
+  const compressed = await compressImage(file);
+
   if (isSupabaseConfigured) {
-    const fileExt = file.name.split(".").pop() || "jpg";
-    const fileName = `product-${Date.now()}.${fileExt}`;
+    const fileName = `product-${Date.now()}.jpg`;
     const { error } = await supabase.storage
       .from("product-images")
-      .upload(fileName, file, { cacheControl: "3600", upsert: false });
+      .upload(fileName, compressed, { cacheControl: "3600", upsert: false, contentType: "image/jpeg" });
 
     if (error) {
-      console.error("Image upload failed, falling back to local:", error.message);
-      return fileToDataUrl(file);
+      throw new Error(`Photo upload failed: ${error.message}`);
     }
 
     const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
     return data.publicUrl;
   }
-  return fileToDataUrl(file);
+
+  return blobToDataUrl(compressed);
 }
 
-function fileToDataUrl(file: File): Promise<string> {
+// Resizes an image down to a max dimension and re-encodes it as a
+// compact JPEG, so uploads stay small and fast regardless of the
+// original phone photo's size.
+function compressImage(file: File, maxDimension = 1000, quality = 0.8): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Could not process image"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Could not process image"));
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not read image file"));
+    };
+    img.src = objectUrl;
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = reject;
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
 }

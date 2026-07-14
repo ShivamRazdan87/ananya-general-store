@@ -377,63 +377,76 @@ function ProductsManager({
       const url = await uploadProductImage(file);
       setForm((f) => ({ ...f, image: url }));
       toast.success("Photo added");
-    } catch (err) {
-      toast.error("Couldn't upload photo, try again");
+    } catch (err: any) {
+      toast.error(`Couldn't upload photo: ${err?.message || "try again"}`);
     } finally {
       setUploading(false);
       e.target.value = "";
     }
   };
 
-  const handleSave = () => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!form.name || !form.price) {
       toast.error("Please fill required fields");
       return;
     }
-    if (editingId) {
-      updateProduct(editingId, {
-        name: form.name,
-        category: form.category,
-        brand: form.brand,
-        price: Number(form.price),
-        mrp: Number(form.mrp) || Number(form.price),
-        unit: form.unit,
-        stock: Number(form.stock),
-        image: form.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400",
-      });
-      toast.success("Product updated");
-    } else {
-      addProduct({
-        id: `p-${Date.now()}`,
-        name: form.name,
-        category: form.category,
-        subCategory: "General",
-        brand: form.brand || "Generic",
-        price: Number(form.price),
-        mrp: Number(form.mrp) || Number(form.price),
-        unit: form.unit || "1 pc",
-        image: form.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400",
-        rating: 4.0,
-        reviewCount: 0,
-        stock: Number(form.stock) || 50,
-        description: `${form.name} - freshly added product.`,
-        tags: [],
-        isVeg: true,
-      });
-      toast.success("Product added");
+    setSaving(true);
+    try {
+      if (editingId) {
+        await updateProduct(editingId, {
+          name: form.name,
+          category: form.category,
+          brand: form.brand,
+          price: Number(form.price),
+          mrp: Number(form.mrp) || Number(form.price),
+          unit: form.unit,
+          stock: Number(form.stock),
+          image: form.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400",
+        });
+        toast.success("Product updated for everyone");
+      } else {
+        await addProduct({
+          id: `p-${Date.now()}`,
+          name: form.name,
+          category: form.category,
+          subCategory: "General",
+          brand: form.brand || "Generic",
+          price: Number(form.price),
+          mrp: Number(form.mrp) || Number(form.price),
+          unit: form.unit || "1 pc",
+          image: form.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400",
+          rating: 4.0,
+          reviewCount: 0,
+          stock: Number(form.stock) || 50,
+          description: `${form.name} - freshly added product.`,
+          tags: [],
+          isVeg: true,
+        });
+        toast.success("Product added for everyone");
+      }
+      resetForm();
+    } catch (err: any) {
+      toast.error(`Couldn't save — it only updated on this device. ${err?.message || "Try again."}`);
+    } finally {
+      setSaving(false);
     }
-    resetForm();
   };
 
-  const toggleStock = (p: Product) => {
-    if (p.stock > 0) {
-      lastStockRef.current[p.id] = p.stock;
-      updateProduct(p.id, { stock: 0 });
-      toast.success(`${p.name} marked out of stock`);
-    } else {
-      const restored = lastStockRef.current[p.id] || 20;
-      updateProduct(p.id, { stock: restored });
-      toast.success(`${p.name} marked back in stock (${restored})`);
+  const toggleStock = async (p: Product) => {
+    try {
+      if (p.stock > 0) {
+        lastStockRef.current[p.id] = p.stock;
+        await updateProduct(p.id, { stock: 0 });
+        toast.success(`${p.name} marked out of stock`);
+      } else {
+        const restored = lastStockRef.current[p.id] || 20;
+        await updateProduct(p.id, { stock: restored });
+        toast.success(`${p.name} marked back in stock (${restored})`);
+      }
+    } catch (err: any) {
+      toast.error(`Couldn't sync stock change: ${err?.message || "try again"}`);
     }
   };
 
@@ -502,8 +515,8 @@ function ProductsManager({
             <input placeholder="MRP" type="number" value={form.mrp} onChange={(e) => setForm({ ...form, mrp: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <input placeholder="Stock" type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
           </div>
-          <button onClick={handleSave} disabled={uploading} className="btn-primary text-sm px-5 py-2 mt-4 disabled:opacity-50">
-            {editingId ? "Update Product" : "Add Product"}
+          <button onClick={handleSave} disabled={uploading || saving} className="btn-primary text-sm px-5 py-2 mt-4 disabled:opacity-50">
+            {saving ? "Saving..." : editingId ? "Update Product" : "Add Product"}
           </button>
         </div>
       )}
