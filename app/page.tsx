@@ -139,14 +139,15 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <div className="hidden md:block relative h-56 rounded-2xl overflow-hidden">
-            <Image
-              src="/society.jpg"
-              alt="Delivery"
-              fill
-              unoptimized
-              className="object-cover"
-            />
+          <div className="hidden md:block relative h-56 rounded-2xl overflow-hidden bg-leaf-900">
+  <Image
+    src="/society.jpg"
+    alt="Delivery"
+    fill
+    unoptimized
+    className="object-contain"
+  />
+</div>
           </div>
         </motion.div>
       </section>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -31,6 +31,8 @@ export default function Navbar() {
   const { isLoggedIn, user } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
   const isOpen = useStoreSettingsStore((s) => s.isOpen);
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => setHasMounted(true), []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,17 +40,17 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white shadow-sm">
+    <header className="sticky top-0 z-40 bg-white shadow-sm print:hidden">
       <div className={isOpen ? "bg-leaf-700 text-white text-xs sm:text-sm" : "bg-red-600 text-white text-xs sm:text-sm"}>
-  <div className="container-x flex items-center justify-center gap-2 py-1.5">
-    <Clock size={14} />
-    <span className="font-medium">
-      {isOpen
-        ? "Delivering groceries in 10 mins, exclusively for Parsvnath Edens!"
-        : "We're currently closed — back soon! You can browse, but ordering is paused."}
-    </span>
-  </div>
-</div>
+        <div className="container-x flex items-center justify-center gap-2 py-1.5">
+          <Clock size={14} />
+          <span className="font-medium">
+            {isOpen
+              ? "Delivering groceries in 10 mins, exclusively for Parsvnath Edens!"
+              : "We're currently closed — back soon! You can browse, but ordering is paused."}
+          </span>
+        </div>
+      </div>
 
       <div className="container-x py-3">
         <div className="flex items-center gap-3 md:gap-6">
@@ -117,7 +119,7 @@ export default function Navbar() {
               className="relative p-2 rounded-full hover:bg-orange-50 transition"
             >
               <Heart size={22} className="text-gray-700" />
-              {wishlistCount > 0 && (
+              {hasMounted && wishlistCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-saffron-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
                   {wishlistCount}
                 </span>
@@ -128,7 +130,7 @@ export default function Navbar() {
               className="relative p-2 rounded-full hover:bg-orange-50 transition"
             >
               <ShoppingCart size={22} className="text-gray-700" />
-              {totalItems > 0 && (
+              {hasMounted && totalItems > 0 && (
                 <motion.span
                   key={totalItems}
                   initial={{ scale: 0.4 }}
@@ -145,7 +147,7 @@ export default function Navbar() {
               className="p-2 rounded-full hover:bg-orange-50 transition hidden sm:flex items-center gap-2"
             >
               <User size={22} className="text-gray-700" />
-              {isLoggedIn && (
+              {hasMounted && isLoggedIn && (
                 <span className="hidden xl:inline text-sm font-medium">
                   {user?.name.split(" ")[0]}
                 </span>
