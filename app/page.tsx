@@ -74,9 +74,10 @@ export default function HomePage() {
             className="relative h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl"
           >
             <Image
-              src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=900"
-              alt="Fresh groceries"
+              src="/store-front.jpg"
+              alt="Ananya General Store"
               fill
+              unoptimized
               className="object-cover"
               priority
             />
@@ -139,7 +140,7 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <div className="hidden md:block relative h-56 rounded-2xl overflow-hidden bg-leaf-900">
+          <div className="block relative h-48 md:h-56 rounded-2xl overflow-hidden bg-leaf-900">
             <Image
               src="/society.jpg"
               alt="Delivery"
