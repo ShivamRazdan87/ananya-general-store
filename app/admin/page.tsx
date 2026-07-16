@@ -17,6 +17,8 @@ import {
   Sun,
   PackageX,
   PackageCheck,
+  Download,
+  Printer,
 } from "lucide-react";
 import {
   BarChart,
@@ -35,10 +37,12 @@ import clsx from "clsx";
 import { useOrderStore, OrderStatus } from "@/store/useOrderStore";
 import { uploadProductImage } from "@/lib/supabase";
 import { useProductStore } from "@/store/useProductStore";
+import { useStoreSettingsStore } from "@/store/useStoreSettingsStore";
 import { Product, categories } from "@/lib/data";
 import { toast } from "sonner";
 
 const ADMIN_EMAIL = "admin@ananya.com";
+const LOW_STOCK_THRESHOLD = 5;
 const ADMIN_PASSWORD = "admin123";
 
 const statusOptions: OrderStatus[] = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"];
@@ -59,7 +63,40 @@ export default function AdminPage() {
 
   const { orders, updateStatus, fetchOrders } = useOrderStore();
   const { products, addProduct, updateProduct, deleteProduct } = useProductStore();
+  const { isOpen: isStoreOpen, setOpen: setStoreOpen } = useStoreSettingsStore();
   const knownOrderIdsRef = useRef<Set<string> | null>(null);
+
+  const handleToggleStoreOpen = async () => {
+    try {
+      await setStoreOpen(!isStoreOpen);
+      toast.success(isStoreOpen ? "Store marked as closed" : "Store marked as open");
+    } catch (err: any) {
+      toast.error(`Couldn't update store status: ${err?.message || "try again"}`);
+    }
+  };
+
+  const handleExportCsv = () => {
+    const headers = ["Order ID", "Customer", "Email", "Amount", "Payment", "Status", "Address", "Date"];
+    const rows = orders.map((o) => [
+      o.id,
+      o.customerName,
+      o.customerEmail,
+      o.total.toFixed(2),
+      o.paymentMethod,
+      o.status,
+      `"${o.address.replace(/"/g, '""')}"`,
+      new Date(o.createdAt).toLocaleString("en-IN"),
+    ]);
+    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ananya-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Orders exported");
+  };
 
   // Watch for new orders while the admin panel is open, and alert with
   // sound + vibration (phones) so the shop owner notices right away.
@@ -130,6 +167,8 @@ export default function AdminPage() {
     const todaysOrders = orders.filter((o) => new Date(o.createdAt).toDateString() === todayStr);
     const todaysRevenue = todaysOrders.reduce((s, o) => s + o.total, 0);
 
+    const lowStockCount = products.filter((p) => p.stock > 0 && p.stock <= LOW_STOCK_THRESHOLD).length;
+
     return {
       totalRevenue,
       totalOrders,
@@ -137,8 +176,9 @@ export default function AdminPage() {
       pendingOrders,
       todaysOrderCount: todaysOrders.length,
       todaysRevenue,
+      lowStockCount,
     };
-  }, [orders]);
+  }, [orders, products]);
 
   const revenueByDay = useMemo(() => {
     const map: Record<string, number> = {};
@@ -225,15 +265,45 @@ export default function AdminPage() {
 
       {tab === "dashboard" && (
         <div>
+          <div className="card p-5 mb-6 flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="font-bold">Store Status</h3>
+              <p className="text-sm text-gray-500">
+                {isStoreOpen ? "You're open and accepting orders." : "Ordering is paused — customers can browse but can't check out."}
+              </p>
+            </div>
+            <button
+              onClick={handleToggleStoreOpen}
+              className={clsx(
+                "px-5 py-2.5 rounded-xl font-semibold text-sm transition",
+                isStoreOpen ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-leaf-100 text-leaf-700 hover:bg-leaf-200"
+              )}
+            >
+              {isStoreOpen ? "Close Store" : "Open Store"}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <a
+              href="/admin/poster"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold text-saffron-600 flex items-center gap-1"
+            >
+              🖨️ Print QR poster for your society noticeboard →
+            </a>
+          </div>
+
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             <StatCard icon={Sun} label="Today's Orders" value={stats.todaysOrderCount.toString()} color="saffron" />
             <StatCard icon={IndianRupee} label="Today's Revenue" value={`₹${stats.todaysRevenue.toFixed(0)}`} color="leaf" />
             <StatCard icon={Package} label="Pending Orders" value={stats.pendingOrders.toString()} color="red" />
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <StatCard icon={IndianRupee} label="Total Revenue (all-time)" value={`₹${stats.totalRevenue.toFixed(0)}`} color="saffron" />
             <StatCard icon={ShoppingBag} label="Total Orders (all-time)" value={stats.totalOrders.toString()} color="leaf" />
             <StatCard icon={TrendingUp} label="Avg. Order Value" value={`₹${stats.avgOrderValue.toFixed(0)}`} color="haldi" />
+            <StatCard icon={PackageX} label="Low Stock Items" value={stats.lowStockCount.toString()} color="red" />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
@@ -268,49 +338,68 @@ export default function AdminPage() {
       )}
 
       {tab === "orders" && (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-              <tr>
-                <th className="text-left p-3">Order ID</th>
-                <th className="text-left p-3">Customer</th>
-                <th className="text-left p-3">Amount</th>
-                <th className="text-left p-3">Payment</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-left p-3">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => (
-                <tr key={order.id} className="border-t border-gray-100">
-                  <td className="p-3 font-semibold">{order.id}</td>
-                  <td className="p-3">{order.customerName}</td>
-                  <td className="p-3">₹{order.total.toFixed(2)}</td>
-                  <td className="p-3">{order.paymentMethod}</td>
-                  <td className="p-3">
-                    <select
-                      value={order.status}
-                      onChange={(e) => {
-                        updateStatus(order.id, e.target.value as OrderStatus);
-                        toast.success(`Order ${order.id} updated to ${e.target.value}`);
-                      }}
-                      className={clsx(
-                        "text-xs font-semibold px-2 py-1 rounded-full border-0 outline-none cursor-pointer",
-                        statusColors[order.status]
-                      )}
-                    >
-                      {statusOptions.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="p-3 text-gray-400 text-xs">
-                    {new Date(order.createdAt).toLocaleDateString("en-IN")}
-                  </td>
+        <div>
+          <div className="flex justify-end mb-3">
+            <button onClick={handleExportCsv} className="btn-secondary text-sm px-4 py-2 flex items-center gap-1">
+              <Download size={15} /> Export CSV
+            </button>
+          </div>
+          <div className="card overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                <tr>
+                  <th className="text-left p-3">Order ID</th>
+                  <th className="text-left p-3">Customer</th>
+                  <th className="text-left p-3">Amount</th>
+                  <th className="text-left p-3">Payment</th>
+                  <th className="text-left p-3">Status</th>
+                  <th className="text-left p-3">Date</th>
+                  <th className="text-left p-3">Slip</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order.id} className="border-t border-gray-100">
+                    <td className="p-3 font-semibold">{order.id}</td>
+                    <td className="p-3">{order.customerName}</td>
+                    <td className="p-3">₹{order.total.toFixed(2)}</td>
+                    <td className="p-3">{order.paymentMethod}</td>
+                    <td className="p-3">
+                      <select
+                        value={order.status}
+                        onChange={(e) => {
+                          updateStatus(order.id, e.target.value as OrderStatus);
+                          toast.success(`Order ${order.id} updated to ${e.target.value}`);
+                        }}
+                        className={clsx(
+                          "text-xs font-semibold px-2 py-1 rounded-full border-0 outline-none cursor-pointer",
+                          statusColors[order.status]
+                        )}
+                      >
+                        {statusOptions.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="p-3 text-gray-400 text-xs">
+                      {new Date(order.createdAt).toLocaleDateString("en-IN")}
+                    </td>
+                    <td className="p-3">
+                      <a
+                        href={`/admin/print/${order.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:text-blue-700"
+                        title="Print order slip"
+                      >
+                        <Printer size={16} />
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -539,8 +628,17 @@ function ProductsManager({
                 <td className="p-3 text-gray-500">{p.category}</td>
                 <td className="p-3">₹{p.price}</td>
                 <td className="p-3">
-                  <span className={clsx("px-2 py-0.5 rounded-full text-xs font-semibold", p.stock > 0 ? "bg-leaf-100 text-leaf-700" : "bg-red-100 text-red-600")}>
-                    {p.stock > 0 ? `${p.stock} in stock` : "Out of stock"}
+                  <span
+                    className={clsx(
+                      "px-2 py-0.5 rounded-full text-xs font-semibold",
+                      p.stock === 0
+                        ? "bg-red-100 text-red-600"
+                        : p.stock <= LOW_STOCK_THRESHOLD
+                        ? "bg-haldi-100 text-haldi-800"
+                        : "bg-leaf-100 text-leaf-700"
+                    )}
+                  >
+                    {p.stock === 0 ? "Out of stock" : p.stock <= LOW_STOCK_THRESHOLD ? `Low: ${p.stock} left` : `${p.stock} in stock`}
                   </span>
                 </td>
                 <td className="p-3 flex gap-2 items-center">

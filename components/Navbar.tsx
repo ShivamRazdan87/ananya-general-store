@@ -20,6 +20,7 @@ import { useCartStore } from "@/store/useCartStore";
 import { useWishlistStore } from "@/store/useWishlistStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useThemeStore } from "@/store/useThemeStore";
+import { useStoreSettingsStore } from "@/store/useStoreSettingsStore";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -29,6 +30,7 @@ export default function Navbar() {
   const wishlistCount = useWishlistStore((s) => s.items.length);
   const { isLoggedIn, user } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
+  const isOpen = useStoreSettingsStore((s) => s.isOpen);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,14 +39,16 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 bg-white shadow-sm">
-      <div className="bg-leaf-700 text-white text-xs sm:text-sm">
-        <div className="container-x flex items-center justify-center gap-2 py-1.5">
-          <Clock size={14} />
-          <span className="font-medium">
-            Delivering groceries in 10 mins, exclusively for Parsvnath Edens!
-          </span>
-        </div>
-      </div>
+      <div className={isOpen ? "bg-leaf-700 text-white text-xs sm:text-sm" : "bg-red-600 text-white text-xs sm:text-sm"}>
+  <div className="container-x flex items-center justify-center gap-2 py-1.5">
+    <Clock size={14} />
+    <span className="font-medium">
+      {isOpen
+        ? "Delivering groceries in 10 mins, exclusively for Parsvnath Edens!"
+        : "We're currently closed — back soon! You can browse, but ordering is paused."}
+    </span>
+  </div>
+</div>
 
       <div className="container-x py-3">
         <div className="flex items-center gap-3 md:gap-6">

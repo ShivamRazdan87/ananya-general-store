@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useProductStore } from "@/store/useProductStore";
 import { useOrderStore } from "@/store/useOrderStore";
+import { useStoreSettingsStore } from "@/store/useStoreSettingsStore";
 
 // Keeps product & order data fresh across devices automatically, without
 // needing a manual page reload:
@@ -13,11 +14,13 @@ import { useOrderStore } from "@/store/useOrderStore";
 export default function StoreSync() {
   const fetchProducts = useProductStore((s) => s.fetchProducts);
   const fetchOrders = useOrderStore((s) => s.fetchOrders);
+  const fetchSettings = useStoreSettingsStore((s) => s.fetchSettings);
 
   useEffect(() => {
     const refresh = () => {
       fetchProducts();
       fetchOrders();
+      fetchSettings();
     };
 
     refresh();

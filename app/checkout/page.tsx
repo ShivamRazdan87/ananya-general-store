@@ -8,6 +8,7 @@ import { useCartStore } from "@/store/useCartStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useOrderStore } from "@/store/useOrderStore";
 import { deliverySlots, storeConfig } from "@/lib/data";
+import { useStoreSettingsStore } from "@/store/useStoreSettingsStore";
 import PaymentModal, { PaymentMethod } from "@/components/PaymentModal";
 import { toast } from "sonner";
 
@@ -16,6 +17,7 @@ export default function CheckoutPage() {
   const { items, getSubtotal, clearCart } = useCartStore();
   const { user, isLoggedIn, addAddress } = useAuthStore();
   const { placeOrder } = useOrderStore();
+  const isStoreOpen = useStoreSettingsStore((s) => s.isOpen);
 
   const [selectedAddressId, setSelectedAddressId] = useState(
     user?.addresses.find((a) => a.isDefault)?.id || user?.addresses[0]?.id || ""
@@ -201,13 +203,18 @@ export default function CheckoutPage() {
               <span>₹{total.toFixed(2)}</span>
             </div>
           </div>
-          <button
-            disabled={!selectedAddress}
-            onClick={() => setShowPayment(true)}
-            className="btn-primary w-full py-3 mt-5 disabled:opacity-50"
-          >
-            {selectedAddress ? `Pay ₹${total.toFixed(2)}` : "Select an address"}
-          </button>
+          {!isStoreOpen && (
+  <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 mt-4">
+    We're currently closed and not accepting orders right now. Please check back soon!
+  </div>
+)}
+<button
+  disabled={!selectedAddress || !isStoreOpen}
+  onClick={() => setShowPayment(true)}
+  className="btn-primary w-full py-3 mt-5 disabled:opacity-50"
+>
+  {!isStoreOpen ? "Store is currently closed" : selectedAddress ? `Pay ₹${total.toFixed(2)}` : "Select an address"}
+</button>
         </div>
       </div>
 
