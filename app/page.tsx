@@ -140,17 +140,15 @@ export default function HomePage() {
             </div>
           </div>
           <div className="hidden md:block relative h-56 rounded-2xl overflow-hidden bg-leaf-900">
-  <Image
-    src="/society.jpg"
-    alt="Delivery"
-    fill
-    unoptimized
-    className="object-contain"
-  />
-</div>
+            <Image
+              src="/society.jpg"
+              alt="Delivery"
+              fill
+              unoptimized
+              className="object-contain"
+            />
           </div>
         </motion.div>
-      </section>
 
       {/* Categories */}
       <section className="container-x py-8">
