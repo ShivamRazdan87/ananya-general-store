@@ -9,7 +9,7 @@ export const metadata = {
 export default function AboutPage() {
   return (
     <div>
-      <section className="bg-gradient-to-br from-saffron-50 to-leaf-50 py-14">
+      <section className="bg-gradient-to-br from-saffron-50 to-leaf-50 dark:from-gray-900 dark:to-gray-900 py-14">
         <div className="container-x text-center">
           <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900">
             About Ananya General Store

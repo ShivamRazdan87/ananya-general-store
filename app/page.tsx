@@ -40,7 +40,7 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-saffron-50 via-white to-leaf-50 overflow-hidden">
+      <section className="bg-gradient-to-br from-saffron-50 via-white to-leaf-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 overflow-hidden">
         <div className="container-x py-10 md:py-16 grid md:grid-cols-2 gap-8 items-center">
           <motion.div initial="hidden" animate="visible" variants={heroContainer}>
             <motion.span
