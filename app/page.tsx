@@ -149,6 +149,7 @@ export default function HomePage() {
             />
           </div>
         </motion.div>
+      </section>
 
       {/* Categories */}
       <section className="container-x py-8">
