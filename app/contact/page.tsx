@@ -3,14 +3,31 @@
 import { useState } from "react";
 import { Phone, Mail, MapPin, Clock, Send } from "lucide-react";
 import { toast } from "sonner";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.message) {
       toast.error("Please fill all fields");
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      toast.error("Message sending isn't set up yet. Please call or email us directly.");
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.from("contact_messages").insert({
+      name: form.name,
+      email: form.email,
+      message: form.message,
+    });
+    setSubmitting(false);
+    if (error) {
+      toast.error("Couldn't send your message. Please try again.");
       return;
     }
     toast.success("Message sent! We'll get back to you soon.");
@@ -27,7 +44,7 @@ export default function ContactPage() {
       <div className="grid md:grid-cols-2 gap-10 max-w-5xl mx-auto">
         <div className="space-y-5">
           {[
-            { icon: Phone, title: "Call Us", desc: "+91 99588 82260", sub: "Mon-Sun, 8 AM - 11 PM" },
+            { icon: Phone, title: "Call Us", desc: "+91 99104 28488", sub: "Mon-Sun, 8 AM - 11 PM" },
             { icon: Mail, title: "Email Us", desc: "support@ananyastore.in", sub: "We reply within 24 hours" },
             { icon: MapPin, title: "Visit Us", desc: "Parsvnath Edens, Alpha-2, Greater Noida", sub: "Our flagship store" },
             { icon: Clock, title: "Delivery Hours", desc: "8:00 AM - 11:00 PM", sub: "10 minutes delivery" },
@@ -67,8 +84,8 @@ export default function ContactPage() {
             onChange={(e) => setForm({ ...form, message: e.target.value })}
             className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
           />
-          <button type="submit" className="btn-primary w-full py-3 flex items-center justify-center gap-2">
-            <Send size={16} /> Send Message
+          <button type="submit" disabled={submitting} className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+            <Send size={16} /> {submitting ? "Sending..." : "Send Message"}
           </button>
         </form>
       </div>

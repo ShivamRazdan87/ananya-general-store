@@ -62,7 +62,7 @@ export const products: Product[] = [
 // The store owner can widen this later, but for now it's a single, fixed zone.
 export const storeConfig = {
   storeName: "Ananya General Store",
-  ownerWhatsApp: "919958882260", // digits only, country code first, no + or spaces
+  ownerWhatsApp: "919910428488", // digits only, country code first, no + or spaces
   societyName: "Parsvnath Edens",
   societyArea: "Alpha-2, Greater Noida",
   deliveryMinutes: "10 mins",

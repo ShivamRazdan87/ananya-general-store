@@ -19,6 +19,8 @@ import {
   PackageCheck,
   Download,
   Printer,
+  Mail,
+  Check,
 } from "lucide-react";
 import {
   BarChart,
@@ -35,7 +37,7 @@ import {
 } from "recharts";
 import clsx from "clsx";
 import { useOrderStore, OrderStatus } from "@/store/useOrderStore";
-import { uploadProductImage } from "@/lib/supabase";
+import { uploadProductImage, supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useProductStore } from "@/store/useProductStore";
 import { useStoreSettingsStore } from "@/store/useStoreSettingsStore";
 import { Product, categories } from "@/lib/data";
@@ -59,7 +61,7 @@ export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tab, setTab] = useState<"dashboard" | "orders" | "products">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "orders" | "products" | "messages">("dashboard");
 
   const { orders, updateStatus, fetchOrders } = useOrderStore();
   const { products, addProduct, updateProduct, deleteProduct } = useProductStore();
@@ -249,6 +251,7 @@ export default function AdminPage() {
           { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
           { id: "orders", label: "Orders", icon: ShoppingBag },
           { id: "products", label: "Products", icon: Package },
+          { id: "messages", label: "Messages", icon: Mail },
         ].map((t) => (
           <button
             key={t.id}
@@ -411,6 +414,8 @@ export default function AdminPage() {
           deleteProduct={deleteProduct}
         />
       )}
+
+      {tab === "messages" && <MessagesManager />}
     </div>
   );
 }
@@ -657,6 +662,98 @@ function ProductsManager({
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+function MessagesManager() {
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMessages = async () => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("contact_messages")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error && data) setMessages(data as ContactMessage[]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const markRead = async (id: string) => {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, is_read: true } : m)));
+    await supabase.from("contact_messages").update({ is_read: true }).eq("id", id);
+  };
+
+  const deleteMessage = async (id: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+    const { error } = await supabase.from("contact_messages").delete().eq("id", id);
+    if (error) toast.error("Couldn't delete message");
+    else toast.success("Message deleted");
+  };
+
+  if (loading) return <p className="text-sm text-gray-400">Loading messages...</p>;
+
+  if (messages.length === 0) {
+    return <p className="text-sm text-gray-400">No messages yet.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {messages.map((m) => (
+        <div key={m.id} className={clsx("card p-4", !m.is_read && "border-l-4 border-saffron-500")}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-sm flex items-center gap-2">
+                {m.name}
+                {!m.is_read && (
+                  <span className="text-[10px] bg-saffron-100 text-saffron-700 px-2 py-0.5 rounded-full">New</span>
+                )}
+              </p>
+              <p className="text-xs text-gray-400">{m.email}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {!m.is_read && (
+                <button
+                  onClick={() => markRead(m.id)}
+                  title="Mark as read"
+                  className="text-leaf-600 hover:text-leaf-700"
+                >
+                  <Check size={16} />
+                </button>
+              )}
+              <button
+                onClick={() => deleteMessage(m.id)}
+                title="Delete"
+                className="text-red-500 hover:text-red-700"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+          <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">{m.message}</p>
+          <p className="text-[11px] text-gray-400 mt-2">
+            {new Date(m.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }

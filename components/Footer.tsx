@@ -48,7 +48,7 @@ export default function Footer() {
         <div>
           <h4 className="font-semibold mb-3">Get in Touch</h4>
           <ul className="space-y-3 text-sm text-leaf-200">
-            <li className="flex items-center gap-2"><Phone size={16} /> +91 99588 82260</li>
+            <li className="flex items-center gap-2"><Phone size={16} /> +91 99104 28488</li>
             <li className="flex items-center gap-2"><Mail size={16} /> support@ananyastore.in</li>
             <li className="flex items-center gap-2"><MapPin size={16} /> Parsvnath Edens, Alpha-2, Greater Noida</li>
           </ul>
