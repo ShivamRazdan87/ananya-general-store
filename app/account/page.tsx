@@ -16,6 +16,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useOrderStore, OrderStatus } from "@/store/useOrderStore";
 import { toast } from "sonner";
 import clsx from "clsx";
+import { validateSocietyAddress } from "@/lib/address";
 
 const statusColors: Record<OrderStatus, string> = {
   Pending: "bg-haldi-100 text-haldi-800",
@@ -26,12 +27,12 @@ const statusColors: Record<OrderStatus, string> = {
 };
 
 export default function AccountPage() {
-  const { isLoggedIn, user, login, register, logout, addAddress, removeAddress } = useAuthStore();
+  const { isLoggedIn, user, login, register, resetPassword, logout, addAddress, removeAddress } = useAuthStore();
   const [tab, setTab] = useState<"profile" | "orders" | "addresses">("profile");
   const allOrders = useOrderStore((s) => s.orders);
 
   if (!isLoggedIn) {
-    return <AuthForm login={login} register={register} />;
+    return <AuthForm login={login} register={register} resetPassword={resetPassword} />;
   }
 
   const orders = allOrders.filter((o) => o.customerEmail === user!.email);
@@ -192,7 +193,7 @@ function AddressesTab({
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
           />
           <input
-            placeholder="Flat / Tower No. (e.g. Tower 4, Flat 302)"
+            placeholder="Flat No. (e.g. T-206 or IND-025)"
             value={form.pincode}
             onChange={(e) => setForm({ ...form, pincode: e.target.value })}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
@@ -203,7 +204,12 @@ function AddressesTab({
                 toast.error("Please fill all fields");
                 return;
               }
-              addAddress({ ...form, isDefault: addresses.length === 0 });
+              const result = validateSocietyAddress(form.pincode);
+              if (!result.valid) {
+                toast.error(result.error);
+                return;
+              }
+              addAddress({ ...form, pincode: result.formatted, isDefault: addresses.length === 0 });
               setForm({ label: "Home", fullAddress: "", pincode: "" });
               setShowForm(false);
               toast.success("Address added");
@@ -238,15 +244,19 @@ function AddressesTab({
 function AuthForm({
   login,
   register,
+  resetPassword,
 }: {
   login: (e: string, p: string) => boolean;
   register: (n: string, e: string, p: string, ph: string) => boolean;
+  resetPassword: (e: string, p: string) => boolean;
 }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "reset">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,10 +264,32 @@ function AuthForm({
       const ok = login(email, password);
       if (ok) toast.success("Logged in successfully!");
       else toast.error("Invalid credentials. Try user@ananya.com / 123456");
-    } else {
+    } else if (mode === "register") {
       const ok = register(name, email, password, phone);
       if (ok) toast.success("Account created successfully!");
       else toast.error("Email already registered");
+    }
+  };
+
+  const handleReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resetNewPassword.length < 4) {
+      toast.error("Password should be at least 4 characters");
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      toast.error("Passwords don't match");
+      return;
+    }
+    const ok = resetPassword(email, resetNewPassword);
+    if (ok) {
+      toast.success("Password updated! You can log in now.");
+      setPassword("");
+      setResetNewPassword("");
+      setResetConfirmPassword("");
+      setMode("login");
+    } else {
+      toast.error("We couldn't find an account with that email");
     }
   };
 
@@ -269,52 +301,103 @@ function AuthForm({
             A
           </div>
           <h1 className="text-xl font-bold">
-            {mode === "login" ? "Welcome Back!" : "Create Account"}
+            {mode === "login" ? "Welcome Back!" : mode === "register" ? "Create Account" : "Reset Password"}
           </h1>
           <p className="text-sm text-gray-400">
-            {mode === "login" ? "Login to continue shopping" : "Join Ananya General Store today"}
+            {mode === "login"
+              ? "Login to continue shopping"
+              : mode === "register"
+              ? "Join Ananya General Store today"
+              : "Enter your email and choose a new password"}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {mode === "register" && (
-            <>
-              <input
-                required
-                placeholder="Full Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-              />
-              <input
-                required
-                placeholder="Phone Number"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-              />
-            </>
-          )}
-          <input
-            required
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-          />
-          <input
-            required
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-          />
-          <button type="submit" className="btn-primary w-full py-3 mt-2">
-            {mode === "login" ? "Login" : "Register"}
-          </button>
-        </form>
+        {mode === "reset" ? (
+          <form onSubmit={handleReset} className="space-y-3">
+            <input
+              required
+              type="email"
+              placeholder="Your account email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
+            <input
+              required
+              type="password"
+              placeholder="New password"
+              value={resetNewPassword}
+              onChange={(e) => setResetNewPassword(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
+            <input
+              required
+              type="password"
+              placeholder="Confirm new password"
+              value={resetConfirmPassword}
+              onChange={(e) => setResetConfirmPassword(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
+            <button type="submit" className="btn-primary w-full py-3 mt-2">
+              Update Password
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {mode === "register" && (
+              <>
+                <input
+                  required
+                  placeholder="Full Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+                />
+                <input
+                  required
+                  placeholder="Phone Number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+                />
+              </>
+            )}
+            <input
+              required
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
+            <input
+              required
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
+            {mode === "login" && (
+              <div className="text-right -mt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("reset");
+                    setResetNewPassword("");
+                    setResetConfirmPassword("");
+                  }}
+                  className="text-xs text-saffron-600 font-medium"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+            <button type="submit" className="btn-primary w-full py-3 mt-2">
+              {mode === "login" ? "Login" : "Register"}
+            </button>
+          </form>
+        )}
 
         {mode === "login" && (
           <p className="text-xs text-gray-400 text-center mt-3">
@@ -323,13 +406,21 @@ function AuthForm({
         )}
 
         <p className="text-center text-sm text-gray-500 mt-5">
-          {mode === "login" ? "New here?" : "Already have an account?"}{" "}
-          <button
-            onClick={() => setMode(mode === "login" ? "register" : "login")}
-            className="text-saffron-600 font-semibold"
-          >
-            {mode === "login" ? "Register" : "Login"}
-          </button>
+          {mode === "reset" ? (
+            <button onClick={() => setMode("login")} className="text-saffron-600 font-semibold">
+              Back to Login
+            </button>
+          ) : (
+            <>
+              {mode === "login" ? "New here?" : "Already have an account?"}{" "}
+              <button
+                onClick={() => setMode(mode === "login" ? "register" : "login")}
+                className="text-saffron-600 font-semibold"
+              >
+                {mode === "login" ? "Register" : "Login"}
+              </button>
+            </>
+          )}
         </p>
       </div>
     </div>

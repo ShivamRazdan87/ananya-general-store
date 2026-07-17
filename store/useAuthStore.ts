@@ -23,6 +23,7 @@ interface AuthState {
   isLoggedIn: boolean;
   login: (email: string, password: string) => boolean;
   register: (name: string, email: string, password: string, phone: string) => boolean;
+  resetPassword: (email: string, newPassword: string) => boolean;
   logout: () => void;
   addAddress: (address: Omit<Address, "id">) => void;
   removeAddress: (id: string) => void;
@@ -38,6 +39,43 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isLoggedIn: false,
       login: (email, password) => {
+        // Check localStorage first — this is where password resets and
+        // registered users live, so a reset always takes effect immediately,
+        // even for the demo account.
+        if (typeof window !== "undefined") {
+          const raw = localStorage.getItem("ananya-users");
+          const users: Record<string, { name: string; password: string; phone: string }> = raw
+            ? JSON.parse(raw)
+            : {};
+          const found = users[email];
+          if (found) {
+            if (found.password === password) {
+              set({
+                user: {
+                  name: found.name,
+                  email,
+                  phone: found.phone,
+                  addresses: email === DEFAULT_EMAIL
+                    ? [
+                        {
+                          id: "addr1",
+                          label: "Home",
+                          fullAddress: "Tower 3, Flat 205, Parsvnath Edens, Alpha-2, Greater Noida",
+                          pincode: "201308",
+                          isDefault: true,
+                        },
+                      ]
+                    : [],
+                },
+                isLoggedIn: true,
+              });
+              return true;
+            }
+            return false;
+          }
+        }
+        // Fallback: original hardcoded demo account (only used if it has
+        // never been overridden via reset/registration in this browser)
         if (email === DEFAULT_EMAIL && password === DEFAULT_PASSWORD) {
           set({
             user: {
@@ -58,26 +96,6 @@ export const useAuthStore = create<AuthState>()(
           });
           return true;
         }
-        // allow any previously registered user stored in localStorage "ananya-users"
-        if (typeof window !== "undefined") {
-          const raw = localStorage.getItem("ananya-users");
-          const users: Record<string, { name: string; password: string; phone: string }> = raw
-            ? JSON.parse(raw)
-            : {};
-          const found = users[email];
-          if (found && found.password === password) {
-            set({
-              user: {
-                name: found.name,
-                email,
-                phone: found.phone,
-                addresses: [],
-              },
-              isLoggedIn: true,
-            });
-            return true;
-          }
-        }
         return false;
       },
       register: (name, email, password, phone) => {
@@ -93,6 +111,26 @@ export const useAuthStore = create<AuthState>()(
           isLoggedIn: true,
         });
         return true;
+      },
+      resetPassword: (email, newPassword) => {
+        if (typeof window === "undefined") return false;
+        const raw = localStorage.getItem("ananya-users");
+        const users: Record<string, { name: string; password: string; phone: string }> = raw
+          ? JSON.parse(raw)
+          : {};
+
+        if (users[email]) {
+          users[email] = { ...users[email], password: newPassword };
+          localStorage.setItem("ananya-users", JSON.stringify(users));
+          return true;
+        }
+        if (email === DEFAULT_EMAIL) {
+          users[email] = { name: "Ananya Sharma", password: newPassword, phone: "+91 98765 43210" };
+          localStorage.setItem("ananya-users", JSON.stringify(users));
+          return true;
+        }
+        // Email not recognized — nothing to reset
+        return false;
       },
       logout: () => set({ user: null, isLoggedIn: false }),
       addAddress: (address) => {

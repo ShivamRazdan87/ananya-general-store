@@ -10,6 +10,7 @@ import { useOrderStore } from "@/store/useOrderStore";
 import { deliverySlots, storeConfig } from "@/lib/data";
 import { useStoreSettingsStore } from "@/store/useStoreSettingsStore";
 import PaymentModal, { PaymentMethod } from "@/components/PaymentModal";
+import { validateSocietyAddress } from "@/lib/address";
 import { toast } from "sonner";
 
 export default function CheckoutPage() {
@@ -60,7 +61,12 @@ export default function CheckoutPage() {
       toast.error("Please fill all address fields");
       return;
     }
-    addAddress({ ...newAddress, isDefault: false });
+    const result = validateSocietyAddress(newAddress.pincode);
+    if (!result.valid) {
+      toast.error(result.error);
+      return;
+    }
+    addAddress({ ...newAddress, pincode: result.formatted, isDefault: false });
     setShowAddAddress(false);
     setNewAddress({ label: "Home", fullAddress: "", pincode: "" });
     toast.success("Address added");
@@ -138,7 +144,7 @@ export default function CheckoutPage() {
                   rows={2}
                 />
                 <input
-                  placeholder="Flat / Tower No. (e.g. Tower 4, Flat 302)"
+                  placeholder="Flat No. (e.g. T-206 or IND-025)"
                   value={newAddress.pincode}
                   onChange={(e) => setNewAddress({ ...newAddress, pincode: e.target.value })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-400"
