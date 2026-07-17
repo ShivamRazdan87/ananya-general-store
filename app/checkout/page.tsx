@@ -24,7 +24,7 @@ export default function CheckoutPage() {
     user?.addresses.find((a) => a.isDefault)?.id || user?.addresses[0]?.id || ""
   );
   const [showAddAddress, setShowAddAddress] = useState(false);
-  const [newAddress, setNewAddress] = useState({ label: "Home", fullAddress: "", pincode: "" });
+  const [newAddress, setNewAddress] = useState({ label: "Home", pincode: "" });
   const [slot, setSlot] = useState(deliverySlots[0].id);
   const [showPayment, setShowPayment] = useState(false);
 
@@ -56,8 +56,8 @@ export default function CheckoutPage() {
 
   const selectedAddress = user?.addresses.find((a) => a.id === selectedAddressId);
 
-  const handleAddAddress = () => {
-    if (!newAddress.fullAddress || !newAddress.pincode) {
+  const handleAddAddress = async () => {
+    if (!newAddress.pincode) {
       toast.error("Please fill all address fields");
       return;
     }
@@ -66,9 +66,9 @@ export default function CheckoutPage() {
       toast.error(result.error);
       return;
     }
-    addAddress({ ...newAddress, pincode: result.formatted, isDefault: false });
+    await addAddress({ ...newAddress, pincode: result.formatted, isDefault: false });
     setShowAddAddress(false);
-    setNewAddress({ label: "Home", fullAddress: "", pincode: "" });
+    setNewAddress({ label: "Home", pincode: "" });
     toast.success("Address added");
   };
 
@@ -80,7 +80,7 @@ export default function CheckoutPage() {
       deliveryFee,
       total,
       paymentMethod: methodLabel,
-      address: selectedAddress?.fullAddress || "",
+      address: selectedAddress?.pincode || "",
       pincode: selectedAddress?.pincode || "",
       deliverySlot: deliverySlots.find((s) => s.id === slot)?.label || "",
       customerEmail: user!.email,
@@ -113,7 +113,7 @@ export default function CheckoutPage() {
                   )}
                 >
                   <p className="font-semibold text-sm">{addr.label}</p>
-                  <p className="text-xs text-gray-500">{addr.fullAddress} - {addr.pincode}</p>
+                  <p className="text-xs text-gray-500">{addr.pincode}</p>
                 </button>
               ))}
               {user?.addresses.length === 0 && (
@@ -135,13 +135,6 @@ export default function CheckoutPage() {
                   value={newAddress.label}
                   onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-400"
-                />
-                <textarea
-                  placeholder="Full address"
-                  value={newAddress.fullAddress}
-                  onChange={(e) => setNewAddress({ ...newAddress, fullAddress: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-400"
-                  rows={2}
                 />
                 <input
                   placeholder="Flat No. (e.g. T-206 or IND-025)"

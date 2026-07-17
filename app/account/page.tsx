@@ -27,12 +27,12 @@ const statusColors: Record<OrderStatus, string> = {
 };
 
 export default function AccountPage() {
-  const { isLoggedIn, user, login, register, resetPassword, logout, addAddress, removeAddress } = useAuthStore();
+  const { isLoggedIn, user, login, register, logout, addAddress, removeAddress, requestPasswordReset } = useAuthStore();
   const [tab, setTab] = useState<"profile" | "orders" | "addresses">("profile");
   const allOrders = useOrderStore((s) => s.orders);
 
   if (!isLoggedIn) {
-    return <AuthForm login={login} register={register} resetPassword={resetPassword} />;
+    return <AuthForm login={login} register={register} requestPasswordReset={requestPasswordReset} />;
   }
 
   const orders = allOrders.filter((o) => o.customerEmail === user!.email);
@@ -167,7 +167,7 @@ function AddressesTab({
   removeAddress: (id: string) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ label: "Home", fullAddress: "", pincode: "" });
+  const [form, setForm] = useState({ label: "Home", pincode: "" });
 
   return (
     <div>
@@ -186,12 +186,6 @@ function AddressesTab({
             onChange={(e) => setForm({ ...form, label: e.target.value })}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
           />
-          <textarea
-            placeholder="Full Address"
-            value={form.fullAddress}
-            onChange={(e) => setForm({ ...form, fullAddress: e.target.value })}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
-          />
           <input
             placeholder="Flat No. (e.g. T-206 or IND-025)"
             value={form.pincode}
@@ -199,8 +193,8 @@ function AddressesTab({
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
           />
           <button
-            onClick={() => {
-              if (!form.fullAddress || !form.pincode) {
+            onClick={async () => {
+              if (!form.pincode) {
                 toast.error("Please fill all fields");
                 return;
               }
@@ -209,8 +203,8 @@ function AddressesTab({
                 toast.error(result.error);
                 return;
               }
-              addAddress({ ...form, pincode: result.formatted, isDefault: addresses.length === 0 });
-              setForm({ label: "Home", fullAddress: "", pincode: "" });
+              await addAddress({ ...form, pincode: result.formatted, isDefault: addresses.length === 0 });
+              setForm({ label: "Home", pincode: "" });
               setShowForm(false);
               toast.success("Address added");
             }}
@@ -226,7 +220,7 @@ function AddressesTab({
           <div key={addr.id} className="card p-4 flex items-center justify-between">
             <div>
               <p className="font-semibold text-sm">{addr.label} {addr.isDefault && <span className="text-[10px] bg-leaf-100 text-leaf-700 px-2 py-0.5 rounded-full ml-1">Default</span>}</p>
-              <p className="text-xs text-gray-500">{addr.fullAddress} - {addr.pincode}</p>
+              <p className="text-xs text-gray-500">{addr.pincode}</p>
             </div>
             <button onClick={() => removeAddress(addr.id)} className="text-gray-400 hover:text-red-500">
               <Trash2 size={18} />
@@ -244,52 +238,45 @@ function AddressesTab({
 function AuthForm({
   login,
   register,
-  resetPassword,
+  requestPasswordReset,
 }: {
-  login: (e: string, p: string) => boolean;
-  register: (n: string, e: string, p: string, ph: string) => boolean;
-  resetPassword: (e: string, p: string) => boolean;
+  login: (e: string, p: string) => Promise<{ ok: boolean; error?: string }>;
+  register: (n: string, e: string, p: string, ph: string) => Promise<{ ok: boolean; error?: string }>;
+  requestPasswordReset: (e: string) => Promise<{ ok: boolean; error?: string }>;
 }) {
-  const [mode, setMode] = useState<"login" | "register" | "reset">("login");
+  const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [resetNewPassword, setResetNewPassword] = useState("");
-  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     if (mode === "login") {
-      const ok = login(email, password);
-      if (ok) toast.success("Logged in successfully!");
-      else toast.error("Invalid credentials. Try user@ananya.com / 123456");
+      const result = await login(email, password);
+      if (result.ok) toast.success("Logged in successfully!");
+      else toast.error(result.error || "Invalid credentials");
     } else if (mode === "register") {
-      const ok = register(name, email, password, phone);
-      if (ok) toast.success("Account created successfully!");
-      else toast.error("Email already registered");
+      const result = await register(name, email, password, phone);
+      if (result.ok) toast.success("Account created successfully!");
+      else toast.error(result.error || "Could not create account");
     }
+    setSubmitting(false);
   };
 
-  const handleReset = (e: React.FormEvent) => {
+  const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (resetNewPassword.length < 4) {
-      toast.error("Password should be at least 4 characters");
-      return;
-    }
-    if (resetNewPassword !== resetConfirmPassword) {
-      toast.error("Passwords don't match");
-      return;
-    }
-    const ok = resetPassword(email, resetNewPassword);
-    if (ok) {
-      toast.success("Password updated! You can log in now.");
-      setPassword("");
-      setResetNewPassword("");
-      setResetConfirmPassword("");
-      setMode("login");
+    setSubmitting(true);
+    const result = await requestPasswordReset(email);
+    setSubmitting(false);
+    if (result.ok) {
+      setResetSent(true);
+      toast.success("Reset link sent! Check your email.");
     } else {
-      toast.error("We couldn't find an account with that email");
+      toast.error(result.error || "Could not send reset email");
     }
   };
 
@@ -308,110 +295,101 @@ function AuthForm({
               ? "Login to continue shopping"
               : mode === "register"
               ? "Join Ananya General Store today"
-              : "Enter your email and choose a new password"}
+              : "Enter your email and we'll send you a reset link"}
           </p>
         </div>
 
-        {mode === "reset" ? (
-          <form onSubmit={handleReset} className="space-y-3">
-            <input
-              required
-              type="email"
-              placeholder="Your account email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-            />
-            <input
-              required
-              type="password"
-              placeholder="New password"
-              value={resetNewPassword}
-              onChange={(e) => setResetNewPassword(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-            />
-            <input
-              required
-              type="password"
-              placeholder="Confirm new password"
-              value={resetConfirmPassword}
-              onChange={(e) => setResetConfirmPassword(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-            />
-            <button type="submit" className="btn-primary w-full py-3 mt-2">
-              Update Password
-            </button>
-          </form>
+        {mode === "forgot" ? (
+          resetSent ? (
+            <div className="text-center space-y-4">
+              <p className="text-sm text-gray-500">
+                If an account exists for <span className="font-semibold">{email}</span>, a password reset
+                link has been sent. Check your inbox (and spam folder).
+              </p>
+              <button
+                onClick={() => {
+                  setMode("login");
+                  setResetSent(false);
+                }}
+                className="text-saffron-600 font-semibold text-sm"
+              >
+                Back to Login
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleForgotSubmit} className="space-y-3">
+              <input
+                required
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+              />
+              <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">
+                {submitting ? "Sending..." : "Send Reset Link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="text-center w-full text-sm text-gray-500 mt-1"
+              >
+                Back to Login
+              </button>
+            </form>
+          )
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            {mode === "register" && (
-              <>
-                <input
-                  required
-                  placeholder="Full Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-                />
-                <input
-                  required
-                  placeholder="Phone Number"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-                />
-              </>
-            )}
-            <input
-              required
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-            />
-            <input
-              required
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-            />
-            {mode === "login" && (
-              <div className="text-right -mt-1">
+          <>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {mode === "register" && (
+                <>
+                  <input
+                    required
+                    placeholder="Full Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+                  />
+                  <input
+                    required
+                    placeholder="Phone Number"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+                  />
+                </>
+              )}
+              <input
+                required
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+              />
+              <input
+                required
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+              />
+              {mode === "login" && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode("reset");
-                    setResetNewPassword("");
-                    setResetConfirmPassword("");
-                  }}
-                  className="text-xs text-saffron-600 font-medium"
+                  onClick={() => setMode("forgot")}
+                  className="text-xs text-saffron-600 font-semibold -mt-1"
                 >
                   Forgot password?
                 </button>
-              </div>
-            )}
-            <button type="submit" className="btn-primary w-full py-3 mt-2">
-              {mode === "login" ? "Login" : "Register"}
-            </button>
-          </form>
-        )}
+              )}
+              <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">
+                {submitting ? "Please wait..." : mode === "login" ? "Login" : "Register"}
+              </button>
+            </form>
 
-        {mode === "login" && (
-          <p className="text-xs text-gray-400 text-center mt-3">
-            Demo login: user@ananya.com / 123456
-          </p>
-        )}
-
-        <p className="text-center text-sm text-gray-500 mt-5">
-          {mode === "reset" ? (
-            <button onClick={() => setMode("login")} className="text-saffron-600 font-semibold">
-              Back to Login
-            </button>
-          ) : (
-            <>
+            <p className="text-center text-sm text-gray-500 mt-5">
               {mode === "login" ? "New here?" : "Already have an account?"}{" "}
               <button
                 onClick={() => setMode(mode === "login" ? "register" : "login")}
@@ -419,9 +397,9 @@ function AuthForm({
               >
                 {mode === "login" ? "Register" : "Login"}
               </button>
-            </>
-          )}
-        </p>
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

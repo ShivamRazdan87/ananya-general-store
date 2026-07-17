@@ -13,10 +13,9 @@ export const ADDRESS_FORMAT_ERROR =
  *   - unit: 01 to 08 (max 8 flats per floor)
  *   - e.g. T-206 = floor 2, unit 06 | T-1102 = floor 11, unit 02
  *
- * Independent (Low-rise): IND-<floor><unit>
- *   - floor: 0 (Ground) to 3
- *   - unit: 01 to 99
- *   - e.g. IND-101 = floor 1, unit 01 | IND-311 = floor 3, unit 11
+ * Independent (Low-rise): IND-<flatNumber>
+ *   - resident enters their flat number as-is (1-3 digits)
+ *   - auto zero-padded to 3 digits, e.g. IND-25 -> IND-025
  *
  * Prefix matching is case-insensitive (t-/T-, ind-/IND-) and the
  * stored/displayed value is always normalized to uppercase.
@@ -55,23 +54,12 @@ export function validateSocietyAddress(raw: string): AddressValidation {
   }
 
   const digits = indMatch![1];
-  if (digits.length !== 3) {
+  if (digits.length > 3) {
     return {
       valid: false,
-      error:
-        "Invalid Independent flat number. Format: IND-<floor><unit>, e.g. IND-101 (floor 1, unit 01) or IND-311 (floor 3, unit 11). Use floor 0 for Ground floor.",
+      error: "Invalid Independent flat number. It should be at most 3 digits, e.g. IND-25.",
     };
   }
-  const unitStr = digits.slice(-2);
-  const floorStr = digits.slice(0, -2);
-  const floor = parseInt(floorStr, 10);
-  const unit = parseInt(unitStr, 10);
-
-  if (floor < 0 || floor > 3) {
-    return { valid: false, error: "Independent floor must be between 0 (Ground) and 3." };
-  }
-  if (unit < 1 || unit > 99) {
-    return { valid: false, error: "Independent unit number must be between 01 and 99." };
-  }
-  return { valid: true, formatted: `IND-${digits}` };
+  const padded = digits.padStart(3, "0");
+  return { valid: true, formatted: `IND-${padded}` };
 }

@@ -1,12 +1,11 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 export interface Address {
   id: string;
   label: string;
-  fullAddress: string;
   pincode: string;
   isDefault: boolean;
 }
@@ -18,140 +17,181 @@ export interface User {
   addresses: Address[];
 }
 
+type Result = { ok: true } | { ok: false; error: string };
+
 interface AuthState {
   user: User | null;
   isLoggedIn: boolean;
-  login: (email: string, password: string) => boolean;
-  register: (name: string, email: string, password: string, phone: string) => boolean;
-  resetPassword: (email: string, newPassword: string) => boolean;
-  logout: () => void;
-  addAddress: (address: Omit<Address, "id">) => void;
-  removeAddress: (id: string) => void;
-  updateProfile: (data: Partial<User>) => void;
+  loading: boolean;
+  init: () => Promise<void>;
+  login: (email: string, password: string) => Promise<Result>;
+  register: (name: string, email: string, password: string, phone: string) => Promise<Result>;
+  logout: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<Result>;
+  updatePassword: (newPassword: string) => Promise<Result>;
+  addAddress: (address: Omit<Address, "id">) => Promise<void>;
+  removeAddress: (id: string) => Promise<void>;
+  updateProfile: (data: Partial<Pick<User, "name" | "phone">>) => Promise<void>;
 }
 
-const DEFAULT_EMAIL = "user@ananya.com";
-const DEFAULT_PASSWORD = "123456";
+const NOT_CONFIGURED_ERROR =
+  "Accounts aren't fully set up yet. Please contact the store owner.";
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      user: null,
-      isLoggedIn: false,
-      login: (email, password) => {
-        // Check localStorage first — this is where password resets and
-        // registered users live, so a reset always takes effect immediately,
-        // even for the demo account.
-        if (typeof window !== "undefined") {
-          const raw = localStorage.getItem("ananya-users");
-          const users: Record<string, { name: string; password: string; phone: string }> = raw
-            ? JSON.parse(raw)
-            : {};
-          const found = users[email];
-          if (found) {
-            if (found.password === password) {
-              set({
-                user: {
-                  name: found.name,
-                  email,
-                  phone: found.phone,
-                  addresses: email === DEFAULT_EMAIL
-                    ? [
-                        {
-                          id: "addr1",
-                          label: "Home",
-                          fullAddress: "Tower 3, Flat 205, Parsvnath Edens, Alpha-2, Greater Noida",
-                          pincode: "201308",
-                          isDefault: true,
-                        },
-                      ]
-                    : [],
-                },
-                isLoggedIn: true,
-              });
-              return true;
-            }
-            return false;
-          }
+async function loadUserData(userId: string, email: string): Promise<User> {
+  const [{ data: profile }, { data: addressRows }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+    supabase.from("addresses").select("*").eq("user_id", userId),
+  ]);
+
+  return {
+    name: profile?.name || "",
+    email,
+    phone: profile?.phone || "",
+    addresses: (addressRows || []).map((a: any) => ({
+      id: a.id,
+      label: a.label,
+      pincode: a.pincode,
+      isDefault: a.is_default,
+    })),
+  };
+}
+
+let listenerAttached = false;
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
+  isLoggedIn: false,
+  loading: true,
+
+  init: async () => {
+    if (!isSupabaseConfigured) {
+      set({ loading: false });
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session?.user) {
+      const user = await loadUserData(session.user.id, session.user.email || "");
+      set({ user, isLoggedIn: true, loading: false });
+    } else {
+      set({ loading: false });
+    }
+
+    if (!listenerAttached) {
+      listenerAttached = true;
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === "SIGNED_OUT") {
+          set({ user: null, isLoggedIn: false });
+        } else if (session?.user) {
+          const user = await loadUserData(session.user.id, session.user.email || "");
+          set({ user, isLoggedIn: true });
         }
-        // Fallback: original hardcoded demo account (only used if it has
-        // never been overridden via reset/registration in this browser)
-        if (email === DEFAULT_EMAIL && password === DEFAULT_PASSWORD) {
-          set({
-            user: {
-              name: "Ananya Sharma",
-              email,
-              phone: "+91 98765 43210",
-              addresses: [
-                {
-                  id: "addr1",
-                  label: "Home",
-                  fullAddress: "Tower 3, Flat 205, Parsvnath Edens, Alpha-2, Greater Noida",
-                  pincode: "201308",
-                  isDefault: true,
-                },
-              ],
+      });
+    }
+  },
+
+  login: async (email, password) => {
+    if (!isSupabaseConfigured) return { ok: false, error: NOT_CONFIGURED_ERROR };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) return { ok: false, error: error?.message || "Invalid email or password." };
+    const user = await loadUserData(data.user.id, data.user.email || "");
+    set({ user, isLoggedIn: true });
+    return { ok: true };
+  },
+
+  register: async (name, email, password, phone) => {
+    if (!isSupabaseConfigured) return { ok: false, error: NOT_CONFIGURED_ERROR };
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error || !data.user) return { ok: false, error: error?.message || "Could not create account." };
+
+    await supabase.from("profiles").upsert({ id: data.user.id, name, phone });
+
+    if (data.session) {
+      const user = await loadUserData(data.user.id, email);
+      set({ user, isLoggedIn: true });
+    }
+    return { ok: true };
+  },
+
+  logout: async () => {
+    if (isSupabaseConfigured) await supabase.auth.signOut();
+    set({ user: null, isLoggedIn: false });
+  },
+
+  requestPasswordReset: async (email) => {
+    if (!isSupabaseConfigured) return { ok: false, error: NOT_CONFIGURED_ERROR };
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined,
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  },
+
+  updatePassword: async (newPassword) => {
+    if (!isSupabaseConfigured) return { ok: false, error: NOT_CONFIGURED_ERROR };
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  },
+
+  addAddress: async (address) => {
+    const user = get().user;
+    if (!user || !isSupabaseConfigured) return;
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData.user?.id;
+    if (!userId) return;
+
+    const { data, error } = await supabase
+      .from("addresses")
+      .insert({
+        user_id: userId,
+        label: address.label,
+        pincode: address.pincode,
+        is_default: address.isDefault,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      set({
+        user: {
+          ...user,
+          addresses: [
+            ...user.addresses,
+            {
+              id: data.id,
+              label: data.label,
+              pincode: data.pincode,
+              isDefault: data.is_default,
             },
-            isLoggedIn: true,
-          });
-          return true;
-        }
-        return false;
-      },
-      register: (name, email, password, phone) => {
-        if (typeof window !== "undefined") {
-          const raw = localStorage.getItem("ananya-users");
-          const users = raw ? JSON.parse(raw) : {};
-          if (users[email] || email === DEFAULT_EMAIL) return false;
-          users[email] = { name, password, phone };
-          localStorage.setItem("ananya-users", JSON.stringify(users));
-        }
-        set({
-          user: { name, email, phone, addresses: [] },
-          isLoggedIn: true,
-        });
-        return true;
-      },
-      resetPassword: (email, newPassword) => {
-        if (typeof window === "undefined") return false;
-        const raw = localStorage.getItem("ananya-users");
-        const users: Record<string, { name: string; password: string; phone: string }> = raw
-          ? JSON.parse(raw)
-          : {};
+          ],
+        },
+      });
+    }
+  },
 
-        if (users[email]) {
-          users[email] = { ...users[email], password: newPassword };
-          localStorage.setItem("ananya-users", JSON.stringify(users));
-          return true;
-        }
-        if (email === DEFAULT_EMAIL) {
-          users[email] = { name: "Ananya Sharma", password: newPassword, phone: "+91 98765 43210" };
-          localStorage.setItem("ananya-users", JSON.stringify(users));
-          return true;
-        }
-        // Email not recognized — nothing to reset
-        return false;
-      },
-      logout: () => set({ user: null, isLoggedIn: false }),
-      addAddress: (address) => {
-        const user = get().user;
-        if (!user) return;
-        const newAddr = { ...address, id: `addr-${Date.now()}` };
-        set({ user: { ...user, addresses: [...user.addresses, newAddr] } });
-      },
-      removeAddress: (id) => {
-        const user = get().user;
-        if (!user) return;
-        set({
-          user: { ...user, addresses: user.addresses.filter((a) => a.id !== id) },
-        });
-      },
-      updateProfile: (data) => {
-        const user = get().user;
-        if (!user) return;
-        set({ user: { ...user, ...data } });
-      },
-    }),
-    { name: "ananya-auth" }
-  )
-);
+  removeAddress: async (id) => {
+    const user = get().user;
+    if (!user || !isSupabaseConfigured) return;
+    const { error } = await supabase.from("addresses").delete().eq("id", id);
+    if (!error) {
+      set({ user: { ...user, addresses: user.addresses.filter((a) => a.id !== id) } });
+    }
+  },
+
+  updateProfile: async (data) => {
+    const user = get().user;
+    if (!user) return;
+    if (isSupabaseConfigured) {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (userId) {
+        await supabase.from("profiles").update(data).eq("id", userId);
+      }
+    }
+    set({ user: { ...user, ...data } });
+  },
+}));

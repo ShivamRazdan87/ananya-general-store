@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useProductStore } from "@/store/useProductStore";
 import { useOrderStore } from "@/store/useOrderStore";
 import { useStoreSettingsStore } from "@/store/useStoreSettingsStore";
+import { useAuthStore } from "@/store/useAuthStore";
 
 // Keeps product & order data fresh across devices automatically, without
 // needing a manual page reload:
@@ -15,6 +16,12 @@ export default function StoreSync() {
   const fetchProducts = useProductStore((s) => s.fetchProducts);
   const fetchOrders = useOrderStore((s) => s.fetchOrders);
   const fetchSettings = useStoreSettingsStore((s) => s.fetchSettings);
+  const initAuth = useAuthStore((s) => s.init);
+
+  useEffect(() => {
+    initAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const refresh = () => {
