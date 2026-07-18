@@ -17,6 +17,7 @@ import { useOrderStore, OrderStatus } from "@/store/useOrderStore";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { validateSocietyAddress } from "@/lib/address";
+import { sendOtp, verifyOtp, isValidPhone } from "@/lib/otp";
 
 const statusColors: Record<OrderStatus, string> = {
   Pending: "bg-haldi-100 text-haldi-800",
@@ -27,12 +28,18 @@ const statusColors: Record<OrderStatus, string> = {
 };
 
 export default function AccountPage() {
-  const { isLoggedIn, user, login, register, logout, addAddress, removeAddress, requestPasswordReset } = useAuthStore();
+  const { isLoggedIn, user, isRegisteredPhone, loginWithPhone, registerWithPhone, logout, addAddress, removeAddress } = useAuthStore();
   const [tab, setTab] = useState<"profile" | "orders" | "addresses">("profile");
   const allOrders = useOrderStore((s) => s.orders);
 
   if (!isLoggedIn) {
-    return <AuthForm login={login} register={register} requestPasswordReset={requestPasswordReset} />;
+    return (
+      <AuthForm
+        isRegisteredPhone={isRegisteredPhone}
+        loginWithPhone={loginWithPhone}
+        registerWithPhone={registerWithPhone}
+      />
+    );
   }
 
   const orders = allOrders.filter((o) => o.customerEmail === user!.email);
@@ -167,7 +174,7 @@ function AddressesTab({
   removeAddress: (id: string) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ label: "Home", pincode: "" });
+  const [form, setForm] = useState({ label: "Home", fullAddress: "", pincode: "" });
 
   return (
     <div>
@@ -186,6 +193,12 @@ function AddressesTab({
             onChange={(e) => setForm({ ...form, label: e.target.value })}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
           />
+          <textarea
+            placeholder="Full Address"
+            value={form.fullAddress}
+            onChange={(e) => setForm({ ...form, fullAddress: e.target.value })}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
+          />
           <input
             placeholder="Flat No. (e.g. T-206 or IND-025)"
             value={form.pincode}
@@ -193,8 +206,8 @@ function AddressesTab({
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
           />
           <button
-            onClick={async () => {
-              if (!form.pincode) {
+            onClick={() => {
+              if (!form.fullAddress || !form.pincode) {
                 toast.error("Please fill all fields");
                 return;
               }
@@ -203,8 +216,8 @@ function AddressesTab({
                 toast.error(result.error);
                 return;
               }
-              await addAddress({ ...form, pincode: result.formatted, isDefault: addresses.length === 0 });
-              setForm({ label: "Home", pincode: "" });
+              addAddress({ ...form, pincode: result.formatted, isDefault: addresses.length === 0 });
+              setForm({ label: "Home", fullAddress: "", pincode: "" });
               setShowForm(false);
               toast.success("Address added");
             }}
@@ -220,7 +233,7 @@ function AddressesTab({
           <div key={addr.id} className="card p-4 flex items-center justify-between">
             <div>
               <p className="font-semibold text-sm">{addr.label} {addr.isDefault && <span className="text-[10px] bg-leaf-100 text-leaf-700 px-2 py-0.5 rounded-full ml-1">Default</span>}</p>
-              <p className="text-xs text-gray-500">{addr.pincode}</p>
+              <p className="text-xs text-gray-500">{addr.fullAddress} - {addr.pincode}</p>
             </div>
             <button onClick={() => removeAddress(addr.id)} className="text-gray-400 hover:text-red-500">
               <Trash2 size={18} />
@@ -235,49 +248,74 @@ function AddressesTab({
   );
 }
 
+// Simple 3-step phone + OTP flow:
+//  1. Enter phone number -> "Send OTP" (simulated: code shown on screen)
+//  2. Enter the 6-digit code -> verified
+//  3a. If this phone already has an account -> logged in immediately
+//  3b. If it's a new phone -> ask for name + email to finish registration
 function AuthForm({
-  login,
-  register,
-  requestPasswordReset,
+  isRegisteredPhone,
+  loginWithPhone,
+  registerWithPhone,
 }: {
-  login: (e: string, p: string) => Promise<{ ok: boolean; error?: string }>;
-  register: (n: string, e: string, p: string, ph: string) => Promise<{ ok: boolean; error?: string }>;
-  requestPasswordReset: (e: string) => Promise<{ ok: boolean; error?: string }>;
+  isRegisteredPhone: (phone: string) => boolean;
+  loginWithPhone: (phone: string) => boolean;
+  registerWithPhone: (name: string, phone: string, email: string) => boolean;
 }) {
-  const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [step, setStep] = useState<"phone" | "otp" | "details">("phone");
   const [phone, setPhone] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    if (mode === "login") {
-      const result = await login(email, password);
-      if (result.ok) toast.success("Logged in successfully!");
-      else toast.error(result.error || "Invalid credentials");
-    } else if (mode === "register") {
-      const result = await register(name, email, password, phone);
-      if (result.ok) toast.success("Account created successfully!");
-      else toast.error(result.error || "Could not create account");
+    if (!isValidPhone(phone)) {
+      toast.error("Enter a valid 10-digit phone number");
+      return;
     }
-    setSubmitting(false);
+    setSending(true);
+    const code = sendOtp(phone);
+    setDevOtp(code);
+    // Simulated delivery — no real SMS provider connected yet, so the
+    // code is shown directly instead of being texted.
+    toast.success(`OTP sent! (Simulated — your code is ${code})`, { duration: 8000 });
+    setStep("otp");
+    setSending(false);
   };
 
-  const handleForgotSubmit = async (e: React.FormEvent) => {
+  const handleVerifyOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    const result = await requestPasswordReset(email);
-    setSubmitting(false);
-    if (result.ok) {
-      setResetSent(true);
-      toast.success("Reset link sent! Check your email.");
-    } else {
-      toast.error(result.error || "Could not send reset email");
+    if (!verifyOtp(phone, otp)) {
+      toast.error("Invalid or expired OTP. Try again.");
+      return;
     }
+    if (isRegisteredPhone(phone)) {
+      const ok = loginWithPhone(phone);
+      if (ok) toast.success("Logged in successfully!");
+      else toast.error("Something went wrong, please try again");
+    } else {
+      setStep("details");
+    }
+  };
+
+  const handleResendOtp = () => {
+    const code = sendOtp(phone);
+    setDevOtp(code);
+    toast.success(`New OTP sent! (Simulated — your code is ${code})`, { duration: 8000 });
+  };
+
+  const handleCompleteRegistration = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+    const ok = registerWithPhone(name.trim(), phone, email.trim());
+    if (ok) toast.success("Account created successfully!");
+    else toast.error("Something went wrong, please try again");
   };
 
   return (
@@ -288,117 +326,98 @@ function AuthForm({
             A
           </div>
           <h1 className="text-xl font-bold">
-            {mode === "login" ? "Welcome Back!" : mode === "register" ? "Create Account" : "Reset Password"}
+            {step === "phone" ? "Welcome!" : step === "otp" ? "Verify Your Number" : "Almost There"}
           </h1>
           <p className="text-sm text-gray-400">
-            {mode === "login"
-              ? "Login to continue shopping"
-              : mode === "register"
-              ? "Join Ananya General Store today"
-              : "Enter your email and we'll send you a reset link"}
+            {step === "phone"
+              ? "Enter your phone number to log in or sign up"
+              : step === "otp"
+              ? `Enter the 6-digit code sent to ${phone}`
+              : "Just a couple of details to finish setting up your account"}
           </p>
         </div>
 
-        {mode === "forgot" ? (
-          resetSent ? (
-            <div className="text-center space-y-4">
-              <p className="text-sm text-gray-500">
-                If an account exists for <span className="font-semibold">{email}</span>, a password reset
-                link has been sent. Check your inbox (and spam folder).
+        {step === "phone" && (
+          <form onSubmit={handleSendOtp} className="space-y-3">
+            <input
+              required
+              type="tel"
+              placeholder="10-digit phone number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
+            <button type="submit" disabled={sending} className="btn-primary w-full py-3 mt-2 disabled:opacity-50">
+              Send OTP
+            </button>
+          </form>
+        )}
+
+        {step === "otp" && (
+          <form onSubmit={handleVerifyOtp} className="space-y-3">
+            <input
+              required
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="6-digit OTP"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400 tracking-widest text-center text-lg"
+            />
+            {devOtp && (
+              <p className="text-xs text-saffron-600 text-center">
+                Simulated SMS — your OTP is <span className="font-bold">{devOtp}</span>
               </p>
-              <button
-                onClick={() => {
-                  setMode("login");
-                  setResetSent(false);
-                }}
-                className="text-saffron-600 font-semibold text-sm"
-              >
-                Back to Login
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleForgotSubmit} className="space-y-3">
-              <input
-                required
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-              />
-              <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">
-                {submitting ? "Sending..." : "Send Reset Link"}
-              </button>
+            )}
+            <button type="submit" className="btn-primary w-full py-3 mt-2">
+              Verify & Continue
+            </button>
+            <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
               <button
                 type="button"
-                onClick={() => setMode("login")}
-                className="text-center w-full text-sm text-gray-500 mt-1"
+                onClick={() => {
+                  setStep("phone");
+                  setOtp("");
+                  setDevOtp(null);
+                }}
+                className="hover:text-gray-700"
               >
-                Back to Login
+                Change number
               </button>
-            </form>
-          )
-        ) : (
-          <>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              {mode === "register" && (
-                <>
-                  <input
-                    required
-                    placeholder="Full Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-                  />
-                  <input
-                    required
-                    placeholder="Phone Number"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-                  />
-                </>
-              )}
-              <input
-                required
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-              />
-              <input
-                required
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-              />
-              {mode === "login" && (
-                <button
-                  type="button"
-                  onClick={() => setMode("forgot")}
-                  className="text-xs text-saffron-600 font-semibold -mt-1"
-                >
-                  Forgot password?
-                </button>
-              )}
-              <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">
-                {submitting ? "Please wait..." : mode === "login" ? "Login" : "Register"}
+              <button type="button" onClick={handleResendOtp} className="text-saffron-600 font-medium">
+                Resend OTP
               </button>
-            </form>
+            </div>
+          </form>
+        )}
 
-            <p className="text-center text-sm text-gray-500 mt-5">
-              {mode === "login" ? "New here?" : "Already have an account?"}{" "}
-              <button
-                onClick={() => setMode(mode === "login" ? "register" : "login")}
-                className="text-saffron-600 font-semibold"
-              >
-                {mode === "login" ? "Register" : "Login"}
-              </button>
-            </p>
-          </>
+        {step === "details" && (
+          <form onSubmit={handleCompleteRegistration} className="space-y-3">
+            <input
+              required
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
+            <input
+              type="email"
+              placeholder="Email (optional)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
+            <button type="submit" className="btn-primary w-full py-3 mt-2">
+              Create Account
+            </button>
+          </form>
+        )}
+
+        {step === "phone" && (
+          <p className="text-xs text-gray-400 text-center mt-4">
+            Demo phone: 9876543210 — any OTP shown on screen will work
+          </p>
         )}
       </div>
     </div>
