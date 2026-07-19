@@ -73,7 +73,7 @@ export default function CheckoutPage() {
   };
 
   const handlePaymentSuccess = async (method: PaymentMethod) => {
-    const methodLabel = { upi: "UPI", card: "Card", wallet: "Wallet", cod: "Cash on Delivery" }[method];
+    const methodLabel = { upi: "UPI", card: "Card", wallet: "Wallet", cod: "Cash on Delivery", razorpay: "Razorpay" }[method];
     const order = await placeOrder({
       items,
       subtotal,
@@ -83,7 +83,8 @@ export default function CheckoutPage() {
       address: selectedAddress?.pincode || "",
       pincode: selectedAddress?.pincode || "",
       deliverySlot: deliverySlots.find((s) => s.id === slot)?.label || "",
-      customerEmail: user!.email,
+      customerEmail: user!.email || "",
+      customerPhone: user!.phone,
       customerName: user!.name,
     });
     clearCart();

@@ -17,7 +17,6 @@ import { useOrderStore, OrderStatus } from "@/store/useOrderStore";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { validateSocietyAddress } from "@/lib/address";
-import { sendEmailOtp, verifyEmailOtp, isValidEmail } from "@/lib/emailOtp";
 
 const statusColors: Record<OrderStatus, string> = {
   Pending: "bg-haldi-100 text-haldi-800",
@@ -28,15 +27,19 @@ const statusColors: Record<OrderStatus, string> = {
 };
 
 export default function AccountPage() {
-  const { isLoggedIn, user, logout, addAddress, removeAddress } = useAuthStore();
+  const { isLoggedIn, user, sendOtp, verifyOtp, logout, addAddress, removeAddress, loading } = useAuthStore();
   const [tab, setTab] = useState<"profile" | "orders" | "addresses">("profile");
   const allOrders = useOrderStore((s) => s.orders);
 
-  if (!isLoggedIn) {
-    return <AuthForm />;
+  if (loading) {
+    return <div className="container-x py-24 text-center text-gray-400">Loading...</div>;
   }
 
-  const orders = allOrders.filter((o) => o.customerEmail === user!.email);
+  if (!isLoggedIn) {
+    return <AuthForm sendOtp={sendOtp} verifyOtp={verifyOtp} />;
+  }
+
+  const orders = allOrders.filter((o: any) => o.customerPhone === user!.phone);
 
   return (
     <div className="container-x py-8">
@@ -48,7 +51,7 @@ export default function AccountPage() {
             </div>
             <div>
               <p className="font-semibold text-sm">{user?.name}</p>
-              <p className="text-xs text-gray-400">{user?.email}</p>
+              <p className="text-xs text-gray-400">+91 {user?.phone}</p>
             </div>
           </div>
           <nav className="space-y-1">
@@ -93,19 +96,21 @@ export default function AccountPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 font-medium">Email</label>
-                  <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 mt-1">
-                    <Mail size={16} className="text-gray-400" />
-                    <span className="text-sm">{user?.email}</span>
-                  </div>
-                </div>
-                <div>
                   <label className="text-xs text-gray-500 font-medium">Phone</label>
                   <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 mt-1">
                     <Phone size={16} className="text-gray-400" />
-                    <span className="text-sm">{user?.phone}</span>
+                    <span className="text-sm">+91 {user?.phone}</span>
                   </div>
                 </div>
+                {user?.email && (
+                  <div>
+                    <label className="text-xs text-gray-500 font-medium">Email</label>
+                    <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 mt-1">
+                      <Mail size={16} className="text-gray-400" />
+                      <span className="text-sm">{user?.email}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -168,7 +173,7 @@ function AddressesTab({
   removeAddress: (id: string) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ label: "Home", fullAddress: "", pincode: "" });
+  const [form, setForm] = useState({ label: "Home", pincode: "" });
 
   return (
     <div>
@@ -187,12 +192,6 @@ function AddressesTab({
             onChange={(e) => setForm({ ...form, label: e.target.value })}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
           />
-          <textarea
-            placeholder="Full Address"
-            value={form.fullAddress}
-            onChange={(e) => setForm({ ...form, fullAddress: e.target.value })}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
-          />
           <input
             placeholder="Flat No. (e.g. T-206 or IND-025)"
             value={form.pincode}
@@ -200,8 +199,8 @@ function AddressesTab({
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"
           />
           <button
-            onClick={() => {
-              if (!form.fullAddress || !form.pincode) {
+            onClick={async () => {
+              if (!form.pincode) {
                 toast.error("Please fill all fields");
                 return;
               }
@@ -210,8 +209,8 @@ function AddressesTab({
                 toast.error(result.error);
                 return;
               }
-              addAddress({ ...form, pincode: result.formatted, isDefault: addresses.length === 0 });
-              setForm({ label: "Home", fullAddress: "", pincode: "" });
+              await addAddress({ ...form, pincode: result.formatted, isDefault: addresses.length === 0 });
+              setForm({ label: "Home", pincode: "" });
               setShowForm(false);
               toast.success("Address added");
             }}
@@ -227,7 +226,7 @@ function AddressesTab({
           <div key={addr.id} className="card p-4 flex items-center justify-between">
             <div>
               <p className="font-semibold text-sm">{addr.label} {addr.isDefault && <span className="text-[10px] bg-leaf-100 text-leaf-700 px-2 py-0.5 rounded-full ml-1">Default</span>}</p>
-              <p className="text-xs text-gray-500">{addr.fullAddress} - {addr.pincode}</p>
+              <p className="text-xs text-gray-500">{addr.pincode}</p>
             </div>
             <button onClick={() => removeAddress(addr.id)} className="text-gray-400 hover:text-red-500">
               <Trash2 size={18} />
@@ -242,66 +241,57 @@ function AddressesTab({
   );
 }
 
-// Real 3-step email + OTP flow, backed by Supabase's built-in email OTP:
-//  1. Enter email -> "Send OTP" (Supabase sends a real 6-digit code by email)
-//  2. Enter the code -> verified against Supabase, creates a real session
-//  3a. If this email already has a completed profile -> logged in immediately
-//  3b. If it's a new user -> ask for name + phone to finish registration
-function AuthForm() {
-  const checkIsNewUser = useAuthStore((s) => s.checkIsNewUser);
-  const completeRegistration = useAuthStore((s) => s.completeRegistration);
-
-  const [step, setStep] = useState<"email" | "otp" | "details">("email");
-  const [email, setEmail] = useState("");
+function AuthForm({
+  sendOtp,
+  verifyOtp,
+}: {
+  sendOtp: (phone: string) => Promise<{ ok: boolean; error?: string }>;
+  verifyOtp: (
+    phone: string,
+    otp: string,
+    name?: string
+  ) => Promise<{ ok: boolean; error?: string; isNewUser?: boolean }>;
+}) {
+  const [step, setStep] = useState<"phone" | "otp" | "name">("phone");
+  const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [sending, setSending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValidEmail(email)) {
-      toast.error("Enter a valid email address");
+    if (!/^\d{10}$/.test(phone)) {
+      toast.error("Enter a valid 10-digit phone number");
       return;
     }
-    setSending(true);
-    try {
-      await sendEmailOtp(email);
-      toast.success("OTP sent! Check your email.");
+    setSubmitting(true);
+    const result = await sendOtp(phone);
+    setSubmitting(false);
+    if (result.ok) {
+      toast.success("OTP sent to your phone");
       setStep("otp");
-    } catch (err: any) {
-      toast.error(err?.message || "Could not send OTP. Please try again.");
-    } finally {
-      setSending(false);
+    } else {
+      toast.error(result.error || "Could not send OTP");
     }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setVerifying(true);
-    try {
-      await verifyEmailOtp(email, otp);
-      const isNew = await checkIsNewUser();
-      if (isNew) {
-        setStep("details");
-      } else {
-        toast.success("Logged in successfully!");
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "Invalid or expired OTP. Try again.");
-    } finally {
-      setVerifying(false);
+    if (!otp.trim()) {
+      toast.error("Enter the OTP you received");
+      return;
     }
-  };
-
-  const handleResendOtp = async () => {
-    try {
-      await sendEmailOtp(email);
-      toast.success("OTP resent! Check your email.");
-    } catch (err: any) {
-      toast.error(err?.message || "Could not resend OTP.");
+    setSubmitting(true);
+    const result = await verifyOtp(phone, otp);
+    setSubmitting(false);
+    if (result.isNewUser) {
+      setStep("name");
+      return;
+    }
+    if (result.ok) {
+      toast.success("Logged in successfully!");
+    } else {
+      toast.error(result.error || "Invalid OTP");
     }
   };
 
@@ -312,12 +302,12 @@ function AuthForm() {
       return;
     }
     setSubmitting(true);
-    try {
-      const ok = await completeRegistration(name.trim(), phone.trim());
-      if (ok) toast.success("Account created successfully!");
-      else toast.error("Something went wrong, please try again");
-    } finally {
-      setSubmitting(false);
+    const result = await verifyOtp(phone, otp, name);
+    setSubmitting(false);
+    if (result.ok) {
+      toast.success("Account created successfully!");
+    } else {
+      toast.error(result.error || "Could not create account");
     }
   };
 
@@ -329,29 +319,34 @@ function AuthForm() {
             A
           </div>
           <h1 className="text-xl font-bold">
-            {step === "email" ? "Welcome!" : step === "otp" ? "Verify Your Email" : "Almost There"}
+            {step === "phone" ? "Welcome!" : step === "otp" ? "Verify Your Number" : "Almost There"}
           </h1>
           <p className="text-sm text-gray-400">
-            {step === "email"
-              ? "Enter your email to log in or sign up"
+            {step === "phone"
+              ? "Login or register with your phone number"
               : step === "otp"
-              ? `Enter the code sent to ${email}`
-              : "Just a couple of details to finish setting up your account"}
+              ? `Enter the OTP sent to +91 ${phone}`
+              : "Tell us your name to finish setting up"}
           </p>
         </div>
 
-        {step === "email" && (
+        {step === "phone" && (
           <form onSubmit={handleSendOtp} className="space-y-3">
-            <input
-              required
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-            />
-            <button type="submit" disabled={sending} className="btn-primary w-full py-3 mt-2 disabled:opacity-50">
-              {sending ? "Sending..." : "Send OTP"}
+            <div className="flex items-center border border-gray-200 rounded-xl px-4 py-2.5 gap-2 focus-within:border-saffron-400">
+              <span className="text-sm text-gray-400">+91</span>
+              <input
+                required
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="10-digit phone number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                className="w-full text-sm outline-none"
+              />
+            </div>
+            <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">
+              {submitting ? "Sending..." : "Send OTP"}
             </button>
           </form>
         )}
@@ -360,36 +355,29 @@ function AuthForm() {
           <form onSubmit={handleVerifyOtp} className="space-y-3">
             <input
               required
-              type="text"
               inputMode="numeric"
-              maxLength={8}
-              placeholder="8-digit OTP"
+              placeholder="Enter OTP"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400 tracking-widest text-center text-lg"
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400 text-center tracking-[0.3em]"
             />
-            <button type="submit" disabled={verifying} className="btn-primary w-full py-3 mt-2 disabled:opacity-50">
-              {verifying ? "Verifying..." : "Verify & Continue"}
+            <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">
+              {submitting ? "Verifying..." : "Verify & Continue"}
             </button>
-            <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setStep("email");
-                  setOtp("");
-                }}
-                className="hover:text-gray-700"
-              >
-                Change email
-              </button>
-              <button type="button" onClick={handleResendOtp} className="text-saffron-600 font-medium">
-                Resend OTP
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setStep("phone");
+                setOtp("");
+              }}
+              className="text-center w-full text-sm text-gray-500 mt-1"
+            >
+              Change phone number
+            </button>
           </form>
         )}
 
-        {step === "details" && (
+        {step === "name" && (
           <form onSubmit={handleCompleteRegistration} className="space-y-3">
             <input
               required
@@ -398,15 +386,8 @@ function AuthForm() {
               onChange={(e) => setName(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
             />
-            <input
-              type="tel"
-              placeholder="Phone Number (optional)"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-            />
-            <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-50">
-              {submitting ? "Creating..." : "Create Account"}
+            <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">
+              {submitting ? "Please wait..." : "Complete Registration"}
             </button>
           </form>
         )}

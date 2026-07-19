@@ -10,10 +10,11 @@ import {
   CheckCircle2,
   Loader2,
   QrCode,
+  ShieldCheck,
 } from "lucide-react";
 import clsx from "clsx";
 
-export type PaymentMethod = "upi" | "card" | "wallet" | "cod";
+export type PaymentMethod = "upi" | "card" | "wallet" | "cod" | "razorpay";
 
 interface PaymentModalProps {
   amount: number;
@@ -22,21 +23,117 @@ interface PaymentModalProps {
 }
 
 const methods = [
-  { id: "upi" as const, label: "UPI", desc: "GPay, PhonePe, Paytm & more", icon: Smartphone },
-  { id: "card" as const, label: "Credit / Debit Card", desc: "Visa, Mastercard, RuPay", icon: CreditCard },
-  { id: "wallet" as const, label: "Wallets", desc: "Paytm, Amazon Pay, Mobikwik", icon: Wallet },
+  { id: "razorpay" as const, label: "Pay Online (Razorpay)", desc: "UPI, Cards, Netbanking & more — real payment", icon: ShieldCheck },
+  { id: "upi" as const, label: "UPI (Demo)", desc: "GPay, PhonePe, Paytm & more", icon: Smartphone },
+  { id: "card" as const, label: "Credit / Debit Card (Demo)", desc: "Visa, Mastercard, RuPay", icon: CreditCard },
+  { id: "wallet" as const, label: "Wallets (Demo)", desc: "Paytm, Amazon Pay, Mobikwik", icon: Wallet },
   { id: "cod" as const, label: "Cash on Delivery", desc: "Pay when you receive", icon: Banknote },
 ];
 
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 export default function PaymentModal({ amount, onClose, onSuccess }: PaymentModalProps) {
-  const [selected, setSelected] = useState<PaymentMethod>("upi");
+  const [selected, setSelected] = useState<PaymentMethod>("razorpay");
   const [stage, setStage] = useState<"select" | "processing" | "success">("select");
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
   const [upiId, setUpiId] = useState("");
+  const [razorpayError, setRazorpayError] = useState("");
+
+  const handleRazorpayPay = async () => {
+    setRazorpayError("");
+    setStage("processing");
+
+    try {
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        setRazorpayError("Could not load payment gateway. Check your internet connection.");
+        setStage("select");
+        return;
+      }
+
+      const orderRes = await fetch("/api/razorpay/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const orderData = await orderRes.json();
+
+      if (!orderRes.ok || !orderData.orderId) {
+        setRazorpayError(orderData.error || "Could not start payment. Please try again.");
+        setStage("select");
+        return;
+      }
+
+      const razorpay = new window.Razorpay({
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        order_id: orderData.orderId,
+        name: "Ananya General Store",
+        description: "Order Payment",
+        theme: { color: "#f9ab06" },
+        handler: async (response: any) => {
+          const verifyRes = await fetch("/api/razorpay/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          const verifyData = await verifyRes.json();
+
+          if (verifyData.verified) {
+            setStage("success");
+            setTimeout(() => onSuccess("razorpay"), 1200);
+          } else {
+            setRazorpayError("Payment verification failed. If money was deducted, contact support.");
+            setStage("select");
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setStage("select");
+          },
+        },
+      });
+
+      razorpay.on("payment.failed", () => {
+        setRazorpayError("Payment failed. Please try again.");
+        setStage("select");
+      });
+
+      razorpay.open();
+    } catch (err) {
+      setRazorpayError("Something went wrong. Please try again.");
+      setStage("select");
+    }
+  };
 
   const handlePay = () => {
+    if (selected === "razorpay") {
+      handleRazorpayPay();
+      return;
+    }
     setStage("processing");
     setTimeout(() => {
       setStage("success");
@@ -114,6 +211,19 @@ export default function PaymentModal({ amount, onClose, onSuccess }: PaymentModa
                 })}
               </div>
 
+              {selected === "razorpay" && (
+                <div className="bg-leaf-50 border border-leaf-200 rounded-xl p-4 mb-4 text-sm text-leaf-800">
+                  You'll be redirected to Razorpay's secure checkout to pay via UPI, Card, Netbanking or
+                  Wallet. This is a real payment.
+                </div>
+              )}
+
+              {razorpayError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-600">
+                  {razorpayError}
+                </div>
+              )}
+
               {selected === "upi" && (
                 <div className="bg-gray-50 rounded-xl p-4 mb-4 text-center">
                   <p className="text-xs text-gray-500 mb-3">Scan QR with any UPI app</p>
@@ -185,7 +295,9 @@ export default function PaymentModal({ amount, onClose, onSuccess }: PaymentModa
                 Pay ₹{amount.toFixed(2)}
               </button>
               <p className="text-center text-[11px] text-gray-400 mt-3">
-                🔒 100% Secure Payments (Simulated for demo)
+                {selected === "razorpay"
+                  ? "🔒 100% Secure Payments via Razorpay"
+                  : "🔒 100% Secure Payments (Simulated for demo)"}
               </p>
             </>
           )}
