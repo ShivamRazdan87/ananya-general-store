@@ -17,7 +17,7 @@ import { useOrderStore, OrderStatus } from "@/store/useOrderStore";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { validateSocietyAddress } from "@/lib/address";
-import { sendOtp, verifyOtp, isValidPhone } from "@/lib/otp";
+import { sendEmailOtp, verifyEmailOtp, isValidEmail } from "@/lib/emailOtp";
 
 const statusColors: Record<OrderStatus, string> = {
   Pending: "bg-haldi-100 text-haldi-800",
@@ -28,18 +28,12 @@ const statusColors: Record<OrderStatus, string> = {
 };
 
 export default function AccountPage() {
-  const { isLoggedIn, user, isRegisteredPhone, loginWithPhone, registerWithPhone, logout, addAddress, removeAddress } = useAuthStore();
+  const { isLoggedIn, user, logout, addAddress, removeAddress } = useAuthStore();
   const [tab, setTab] = useState<"profile" | "orders" | "addresses">("profile");
   const allOrders = useOrderStore((s) => s.orders);
 
   if (!isLoggedIn) {
-    return (
-      <AuthForm
-        isRegisteredPhone={isRegisteredPhone}
-        loginWithPhone={loginWithPhone}
-        registerWithPhone={registerWithPhone}
-      />
-    );
+    return <AuthForm />;
   }
 
   const orders = allOrders.filter((o) => o.customerEmail === user!.email);
@@ -248,74 +242,83 @@ function AddressesTab({
   );
 }
 
-// Simple 3-step phone + OTP flow:
-//  1. Enter phone number -> "Send OTP" (simulated: code shown on screen)
-//  2. Enter the 6-digit code -> verified
-//  3a. If this phone already has an account -> logged in immediately
-//  3b. If it's a new phone -> ask for name + email to finish registration
-function AuthForm({
-  isRegisteredPhone,
-  loginWithPhone,
-  registerWithPhone,
-}: {
-  isRegisteredPhone: (phone: string) => boolean;
-  loginWithPhone: (phone: string) => boolean;
-  registerWithPhone: (name: string, phone: string, email: string) => boolean;
-}) {
-  const [step, setStep] = useState<"phone" | "otp" | "details">("phone");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [devOtp, setDevOtp] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [sending, setSending] = useState(false);
+// Real 3-step email + OTP flow, backed by Supabase's built-in email OTP:
+//  1. Enter email -> "Send OTP" (Supabase sends a real 6-digit code by email)
+//  2. Enter the code -> verified against Supabase, creates a real session
+//  3a. If this email already has a completed profile -> logged in immediately
+//  3b. If it's a new user -> ask for name + phone to finish registration
+function AuthForm() {
+  const checkIsNewUser = useAuthStore((s) => s.checkIsNewUser);
+  const completeRegistration = useAuthStore((s) => s.completeRegistration);
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const [step, setStep] = useState<"email" | "otp" | "details">("email");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValidPhone(phone)) {
-      toast.error("Enter a valid 10-digit phone number");
+    if (!isValidEmail(email)) {
+      toast.error("Enter a valid email address");
       return;
     }
     setSending(true);
-    const code = sendOtp(phone);
-    setDevOtp(code);
-    // Simulated delivery — no real SMS provider connected yet, so the
-    // code is shown directly instead of being texted.
-    toast.success(`OTP sent! (Simulated — your code is ${code})`, { duration: 8000 });
-    setStep("otp");
-    setSending(false);
+    try {
+      await sendEmailOtp(email);
+      toast.success("OTP sent! Check your email.");
+      setStep("otp");
+    } catch (err: any) {
+      toast.error(err?.message || "Could not send OTP. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verifyOtp(phone, otp)) {
-      toast.error("Invalid or expired OTP. Try again.");
-      return;
-    }
-    if (isRegisteredPhone(phone)) {
-      const ok = loginWithPhone(phone);
-      if (ok) toast.success("Logged in successfully!");
-      else toast.error("Something went wrong, please try again");
-    } else {
-      setStep("details");
+    setVerifying(true);
+    try {
+      await verifyEmailOtp(email, otp);
+      const isNew = await checkIsNewUser();
+      if (isNew) {
+        setStep("details");
+      } else {
+        toast.success("Logged in successfully!");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Invalid or expired OTP. Try again.");
+    } finally {
+      setVerifying(false);
     }
   };
 
-  const handleResendOtp = () => {
-    const code = sendOtp(phone);
-    setDevOtp(code);
-    toast.success(`New OTP sent! (Simulated — your code is ${code})`, { duration: 8000 });
+  const handleResendOtp = async () => {
+    try {
+      await sendEmailOtp(email);
+      toast.success("OTP resent! Check your email.");
+    } catch (err: any) {
+      toast.error(err?.message || "Could not resend OTP.");
+    }
   };
 
-  const handleCompleteRegistration = (e: React.FormEvent) => {
+  const handleCompleteRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       toast.error("Please enter your name");
       return;
     }
-    const ok = registerWithPhone(name.trim(), phone, email.trim());
-    if (ok) toast.success("Account created successfully!");
-    else toast.error("Something went wrong, please try again");
+    setSubmitting(true);
+    try {
+      const ok = await completeRegistration(name.trim(), phone.trim());
+      if (ok) toast.success("Account created successfully!");
+      else toast.error("Something went wrong, please try again");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -326,29 +329,29 @@ function AuthForm({
             A
           </div>
           <h1 className="text-xl font-bold">
-            {step === "phone" ? "Welcome!" : step === "otp" ? "Verify Your Number" : "Almost There"}
+            {step === "email" ? "Welcome!" : step === "otp" ? "Verify Your Email" : "Almost There"}
           </h1>
           <p className="text-sm text-gray-400">
-            {step === "phone"
-              ? "Enter your phone number to log in or sign up"
+            {step === "email"
+              ? "Enter your email to log in or sign up"
               : step === "otp"
-              ? `Enter the 6-digit code sent to ${phone}`
+              ? `Enter the code sent to ${email}`
               : "Just a couple of details to finish setting up your account"}
           </p>
         </div>
 
-        {step === "phone" && (
+        {step === "email" && (
           <form onSubmit={handleSendOtp} className="space-y-3">
             <input
               required
-              type="tel"
-              placeholder="10-digit phone number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
             />
             <button type="submit" disabled={sending} className="btn-primary w-full py-3 mt-2 disabled:opacity-50">
-              Send OTP
+              {sending ? "Sending..." : "Send OTP"}
             </button>
           </form>
         )}
@@ -359,31 +362,25 @@ function AuthForm({
               required
               type="text"
               inputMode="numeric"
-              maxLength={6}
-              placeholder="6-digit OTP"
+              maxLength={8}
+              placeholder="8-digit OTP"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400 tracking-widest text-center text-lg"
             />
-            {devOtp && (
-              <p className="text-xs text-saffron-600 text-center">
-                Simulated SMS — your OTP is <span className="font-bold">{devOtp}</span>
-              </p>
-            )}
-            <button type="submit" className="btn-primary w-full py-3 mt-2">
-              Verify & Continue
+            <button type="submit" disabled={verifying} className="btn-primary w-full py-3 mt-2 disabled:opacity-50">
+              {verifying ? "Verifying..." : "Verify & Continue"}
             </button>
             <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
               <button
                 type="button"
                 onClick={() => {
-                  setStep("phone");
+                  setStep("email");
                   setOtp("");
-                  setDevOtp(null);
                 }}
                 className="hover:text-gray-700"
               >
-                Change number
+                Change email
               </button>
               <button type="button" onClick={handleResendOtp} className="text-saffron-600 font-medium">
                 Resend OTP
@@ -402,22 +399,16 @@ function AuthForm({
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
             />
             <input
-              type="email"
-              placeholder="Email (optional)"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="tel"
+              placeholder="Phone Number (optional)"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
             />
-            <button type="submit" className="btn-primary w-full py-3 mt-2">
-              Create Account
+            <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-50">
+              {submitting ? "Creating..." : "Create Account"}
             </button>
           </form>
-        )}
-
-        {step === "phone" && (
-          <p className="text-xs text-gray-400 text-center mt-4">
-            Demo phone: 9876543210 — any OTP shown on screen will work
-          </p>
         )}
       </div>
     </div>
