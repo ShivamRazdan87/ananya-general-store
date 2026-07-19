@@ -39,7 +39,7 @@ export default function AccountPage() {
     return <AuthForm sendOtp={sendOtp} verifyOtp={verifyOtp} />;
   }
 
-  const orders = allOrders.filter((o: any) => o.customerPhone === user!.phone);
+  const orders = allOrders.filter((o) => o.customerEmail === user!.email);
 
   return (
     <div className="container-x py-8">
@@ -51,7 +51,7 @@ export default function AccountPage() {
             </div>
             <div>
               <p className="font-semibold text-sm">{user?.name}</p>
-              <p className="text-xs text-gray-400">+91 {user?.phone}</p>
+              <p className="text-xs text-gray-400">{user?.email}</p>
             </div>
           </div>
           <nav className="space-y-1">
@@ -96,18 +96,18 @@ export default function AccountPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 font-medium">Phone</label>
+                  <label className="text-xs text-gray-500 font-medium">Email</label>
                   <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 mt-1">
-                    <Phone size={16} className="text-gray-400" />
-                    <span className="text-sm">+91 {user?.phone}</span>
+                    <Mail size={16} className="text-gray-400" />
+                    <span className="text-sm">{user?.email}</span>
                   </div>
                 </div>
-                {user?.email && (
+                {user?.phone && (
                   <div>
-                    <label className="text-xs text-gray-500 font-medium">Email</label>
+                    <label className="text-xs text-gray-500 font-medium">Phone</label>
                     <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 mt-1">
-                      <Mail size={16} className="text-gray-400" />
-                      <span className="text-sm">{user?.email}</span>
+                      <Phone size={16} className="text-gray-400" />
+                      <span className="text-sm">{user?.phone}</span>
                     </div>
                   </div>
                 )}
@@ -245,30 +245,32 @@ function AuthForm({
   sendOtp,
   verifyOtp,
 }: {
-  sendOtp: (phone: string) => Promise<{ ok: boolean; error?: string }>;
+  sendOtp: (email: string) => Promise<{ ok: boolean; error?: string }>;
   verifyOtp: (
-    phone: string,
+    email: string,
     otp: string,
-    name?: string
+    name?: string,
+    phone?: string
   ) => Promise<{ ok: boolean; error?: string; isNewUser?: boolean }>;
 }) {
-  const [step, setStep] = useState<"phone" | "otp" | "name">("phone");
-  const [phone, setPhone] = useState("");
+  const [step, setStep] = useState<"email" | "otp" | "details">("email");
+  const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!/^\d{10}$/.test(phone)) {
-      toast.error("Enter a valid 10-digit phone number");
+    if (!email.trim()) {
+      toast.error("Enter your email address");
       return;
     }
     setSubmitting(true);
-    const result = await sendOtp(phone);
+    const result = await sendOtp(email.trim());
     setSubmitting(false);
     if (result.ok) {
-      toast.success("OTP sent to your phone");
+      toast.success("OTP sent to your email");
       setStep("otp");
     } else {
       toast.error(result.error || "Could not send OTP");
@@ -282,10 +284,10 @@ function AuthForm({
       return;
     }
     setSubmitting(true);
-    const result = await verifyOtp(phone, otp);
+    const result = await verifyOtp(email.trim(), otp.trim());
     setSubmitting(false);
     if (result.isNewUser) {
-      setStep("name");
+      setStep("details");
       return;
     }
     if (result.ok) {
@@ -302,7 +304,7 @@ function AuthForm({
       return;
     }
     setSubmitting(true);
-    const result = await verifyOtp(phone, otp, name);
+    const result = await verifyOtp(email.trim(), otp.trim(), name, phone);
     setSubmitting(false);
     if (result.ok) {
       toast.success("Account created successfully!");
@@ -319,32 +321,27 @@ function AuthForm({
             A
           </div>
           <h1 className="text-xl font-bold">
-            {step === "phone" ? "Welcome!" : step === "otp" ? "Verify Your Number" : "Almost There"}
+            {step === "email" ? "Welcome!" : step === "otp" ? "Verify Your Email" : "Almost There"}
           </h1>
           <p className="text-sm text-gray-400">
-            {step === "phone"
-              ? "Login or register with your phone number"
+            {step === "email"
+              ? "Login or register with your email"
               : step === "otp"
-              ? `Enter the OTP sent to +91 ${phone}`
-              : "Tell us your name to finish setting up"}
+              ? `Enter the OTP sent to ${email}`
+              : "Tell us a bit about yourself to finish setting up"}
           </p>
         </div>
 
-        {step === "phone" && (
+        {step === "email" && (
           <form onSubmit={handleSendOtp} className="space-y-3">
-            <div className="flex items-center border border-gray-200 rounded-xl px-4 py-2.5 gap-2 focus-within:border-saffron-400">
-              <span className="text-sm text-gray-400">+91</span>
-              <input
-                required
-                type="tel"
-                inputMode="numeric"
-                maxLength={10}
-                placeholder="10-digit phone number"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                className="w-full text-sm outline-none"
-              />
-            </div>
+            <input
+              required
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
             <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">
               {submitting ? "Sending..." : "Send OTP"}
             </button>
@@ -367,23 +364,29 @@ function AuthForm({
             <button
               type="button"
               onClick={() => {
-                setStep("phone");
+                setStep("email");
                 setOtp("");
               }}
               className="text-center w-full text-sm text-gray-500 mt-1"
             >
-              Change phone number
+              Change email
             </button>
           </form>
         )}
 
-        {step === "name" && (
+        {step === "details" && (
           <form onSubmit={handleCompleteRegistration} className="space-y-3">
             <input
               required
               placeholder="Full Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
+            />
+            <input
+              placeholder="Phone Number (optional)"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
             />
             <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">

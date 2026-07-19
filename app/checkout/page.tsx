@@ -83,8 +83,7 @@ export default function CheckoutPage() {
       address: selectedAddress?.pincode || "",
       pincode: selectedAddress?.pincode || "",
       deliverySlot: deliverySlots.find((s) => s.id === slot)?.label || "",
-      customerEmail: user!.email || "",
-      customerPhone: user!.phone,
+      customerEmail: user!.email,
       customerName: user!.name,
     });
     clearCart();
