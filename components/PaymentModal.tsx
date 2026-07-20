@@ -1,20 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
-  Smartphone,
-  CreditCard,
-  Wallet,
   Banknote,
   CheckCircle2,
   Loader2,
-  QrCode,
-  ShieldCheck,
+  IndianRupee,
 } from "lucide-react";
 import clsx from "clsx";
+import QRCode from "qrcode";
+import { buildUpiLink, STORE_UPI_ID } from "@/lib/upi";
 
-export type PaymentMethod = "upi" | "card" | "wallet" | "cod" | "razorpay";
+export type PaymentMethod = "direct_upi" | "cod";
 
 interface PaymentModalProps {
   amount: number;
@@ -23,115 +21,33 @@ interface PaymentModalProps {
 }
 
 const methods = [
-  { id: "razorpay" as const, label: "Pay Online (Razorpay)", desc: "UPI, Cards, Netbanking & more — real payment", icon: ShieldCheck },
-  { id: "upi" as const, label: "UPI (Demo)", desc: "GPay, PhonePe, Paytm & more", icon: Smartphone },
-  { id: "card" as const, label: "Credit / Debit Card (Demo)", desc: "Visa, Mastercard, RuPay", icon: CreditCard },
-  { id: "wallet" as const, label: "Wallets (Demo)", desc: "Paytm, Amazon Pay, Mobikwik", icon: Wallet },
+  { id: "direct_upi" as const, label: "Pay via UPI", desc: "GPay, PhonePe, Paytm & more — real, free payment", icon: IndianRupee },
   { id: "cod" as const, label: "Cash on Delivery", desc: "Pay when you receive", icon: Banknote },
 ];
 
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
-
-function loadRazorpayScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") return resolve(false);
-    if (window.Razorpay) return resolve(true);
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
-
 export default function PaymentModal({ amount, onClose, onSuccess }: PaymentModalProps) {
-  const [selected, setSelected] = useState<PaymentMethod>("razorpay");
+  const [selected, setSelected] = useState<PaymentMethod>("direct_upi");
   const [stage, setStage] = useState<"select" | "processing" | "success">("select");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
-  const [upiId, setUpiId] = useState("");
-  const [razorpayError, setRazorpayError] = useState("");
+  const [qrDataUrl, setQrDataUrl] = useState("");
 
-  const handleRazorpayPay = async () => {
-    setRazorpayError("");
-    setStage("processing");
+  const upiLink = buildUpiLink(amount, "Ananya General Store Order");
 
-    try {
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        setRazorpayError("Could not load payment gateway. Check your internet connection.");
-        setStage("select");
-        return;
-      }
-
-      const orderRes = await fetch("/api/razorpay/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
-      });
-      const orderData = await orderRes.json();
-
-      if (!orderRes.ok || !orderData.orderId) {
-        setRazorpayError(orderData.error || "Could not start payment. Please try again.");
-        setStage("select");
-        return;
-      }
-
-      const razorpay = new window.Razorpay({
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: orderData.amount,
-        currency: orderData.currency,
-        order_id: orderData.orderId,
-        name: "Ananya General Store",
-        description: "Order Payment",
-        theme: { color: "#f9ab06" },
-        handler: async (response: any) => {
-          const verifyRes = await fetch("/api/razorpay/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
-          const verifyData = await verifyRes.json();
-
-          if (verifyData.verified) {
-            setStage("success");
-            setTimeout(() => onSuccess("razorpay"), 1200);
-          } else {
-            setRazorpayError("Payment verification failed. If money was deducted, contact support.");
-            setStage("select");
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setStage("select");
-          },
-        },
-      });
-
-      razorpay.on("payment.failed", () => {
-        setRazorpayError("Payment failed. Please try again.");
-        setStage("select");
-      });
-
-      razorpay.open();
-    } catch (err) {
-      setRazorpayError("Something went wrong. Please try again.");
-      setStage("select");
-    }
-  };
+  useEffect(() => {
+    if (selected !== "direct_upi") return;
+    QRCode.toDataURL(upiLink, { width: 220, margin: 1 })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, amount]);
 
   const handlePay = () => {
-    if (selected === "razorpay") {
-      handleRazorpayPay();
+    if (selected === "direct_upi") {
+      // No gateway in the middle, so there's nothing to "process" — the
+      // customer pays directly via their UPI app, and the store owner
+      // confirms it manually. Order goes through marked as pending
+      // verification (see checkout page's paymentMethod label).
+      setStage("success");
+      setTimeout(() => onSuccess("direct_upi"), 1200);
       return;
     }
     setStage("processing");
@@ -211,77 +127,29 @@ export default function PaymentModal({ amount, onClose, onSuccess }: PaymentModa
                 })}
               </div>
 
-              {selected === "razorpay" && (
-                <div className="bg-leaf-50 border border-leaf-200 rounded-xl p-4 mb-4 text-sm text-leaf-800">
-                  You'll be redirected to Razorpay's secure checkout to pay via UPI, Card, Netbanking or
-                  Wallet. This is a real payment.
-                </div>
-              )}
-
-              {razorpayError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-600">
-                  {razorpayError}
-                </div>
-              )}
-
-              {selected === "upi" && (
+              {selected === "direct_upi" && (
                 <div className="bg-gray-50 rounded-xl p-4 mb-4 text-center">
-                  <p className="text-xs text-gray-500 mb-3">Scan QR with any UPI app</p>
-                  <div className="w-40 h-40 mx-auto bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-3">
-                    <QrCode size={110} strokeWidth={1} className="text-gray-700" />
+                  <p className="text-xs text-gray-500 mb-3">Scan with any UPI app to pay ₹{amount.toFixed(2)}</p>
+                  <div className="w-48 h-48 mx-auto bg-white border border-gray-200 rounded-lg flex items-center justify-center mb-3 overflow-hidden">
+                    {qrDataUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={qrDataUrl} alt="UPI payment QR code" className="w-full h-full object-contain" />
+                    ) : (
+                      <Loader2 className="animate-spin text-gray-300" size={32} />
+                    )}
                   </div>
-                  <p className="text-xs text-gray-400 mb-2">— OR enter UPI ID —</p>
-                  <input
-                    type="text"
-                    placeholder="yourname@upi"
-                    value={upiId}
-                    onChange={(e) => setUpiId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-500"
-                  />
-                </div>
-              )}
-
-              {selected === "card" && (
-                <div className="space-y-3 mb-4">
-                  <input
-                    type="text"
-                    placeholder="Card Number"
-                    maxLength={19}
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-500"
-                  />
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      placeholder="MM/YY"
-                      maxLength={5}
-                      value={cardExpiry}
-                      onChange={(e) => setCardExpiry(e.target.value)}
-                      className="w-1/2 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="CVV"
-                      maxLength={3}
-                      value={cardCvv}
-                      onChange={(e) => setCardCvv(e.target.value)}
-                      className="w-1/2 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-500"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {selected === "wallet" && (
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {["Paytm", "Amazon Pay", "Mobikwik"].map((w) => (
-                    <div
-                      key={w}
-                      className="border border-gray-200 rounded-lg py-3 text-center text-xs font-medium hover:border-saffron-400 cursor-pointer"
-                    >
-                      {w}
-                    </div>
-                  ))}
+                  <p className="text-xs text-gray-400 mb-1">UPI ID</p>
+                  <p className="text-sm font-semibold text-gray-700 mb-3">{STORE_UPI_ID}</p>
+                  <a
+                    href={upiLink}
+                    className="inline-block w-full btn-primary py-2.5 text-sm mb-3"
+                  >
+                    Open UPI App to Pay
+                  </a>
+                  <p className="text-[11px] text-gray-400">
+                    Pays the store directly — no fees. On a phone, tap "Open UPI App" or scan the QR.
+                    After paying, tap "I've Paid" below to place your order.
+                  </p>
                 </div>
               )}
 
@@ -292,12 +160,12 @@ export default function PaymentModal({ amount, onClose, onSuccess }: PaymentModa
               )}
 
               <button onClick={handlePay} className="w-full btn-primary py-3 text-base">
-                Pay ₹{amount.toFixed(2)}
+                {selected === "direct_upi" ? "I've Paid — Place Order" : `Pay ₹${amount.toFixed(2)}`}
               </button>
               <p className="text-center text-[11px] text-gray-400 mt-3">
-                {selected === "razorpay"
-                  ? "🔒 100% Secure Payments via Razorpay"
-                  : "🔒 100% Secure Payments (Simulated for demo)"}
+                {selected === "direct_upi"
+                  ? "🔒 Direct UPI transfer — no fees, no middleman"
+                  : "🔒 Pay in cash when your order arrives"}
               </p>
             </>
           )}
@@ -313,8 +181,14 @@ export default function PaymentModal({ amount, onClose, onSuccess }: PaymentModa
           {stage === "success" && (
             <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
               <CheckCircle2 size={64} className="text-leaf-600 mb-4" />
-              <p className="font-bold text-xl text-gray-800">Payment Successful!</p>
-              <p className="text-sm text-gray-400 mt-1">Redirecting to order confirmation...</p>
+              <p className="font-bold text-xl text-gray-800">
+                {selected === "direct_upi" ? "Order Placed!" : "Payment Successful!"}
+              </p>
+              <p className="text-sm text-gray-400 mt-1 text-center px-6">
+                {selected === "direct_upi"
+                  ? "The store will verify your UPI payment shortly."
+                  : "Redirecting to order confirmation..."}
+              </p>
             </div>
           )}
         </div>

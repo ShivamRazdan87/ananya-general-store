@@ -6,13 +6,16 @@ import { Minus, Plus, Trash2, ShoppingBag, Clock } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { useRouter } from "next/navigation";
 
+const MINIMUM_ORDER_AMOUNT = 150;
+
 export default function CartPage() {
   const { items, updateQuantity, removeItem, getSubtotal } = useCartStore();
   const router = useRouter();
 
   const subtotal = getSubtotal();
-  const deliveryFee = subtotal > 199 || subtotal === 0 ? 0 : 25;
-  const total = subtotal + deliveryFee;
+  const total = subtotal;
+  const belowMinimum = subtotal < MINIMUM_ORDER_AMOUNT;
+  const amountToMinimum = MINIMUM_ORDER_AMOUNT - subtotal;
 
   if (items.length === 0) {
     return (
@@ -76,21 +79,24 @@ export default function CartPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Delivery Fee</span>
-              <span className="font-medium">{deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}</span>
+              <span className="font-medium text-leaf-600">FREE</span>
             </div>
-            {deliveryFee > 0 && (
-              <p className="text-xs text-saffron-600">Add ₹{(199 - subtotal).toFixed(0)} more for free delivery!</p>
-            )}
             <div className="border-t pt-2 flex justify-between font-bold text-base">
               <span>Total</span>
               <span>₹{total.toFixed(2)}</span>
             </div>
           </div>
+          {belowMinimum && (
+            <p className="text-xs text-saffron-600 mt-3">
+              Add ₹{amountToMinimum.toFixed(0)} more to reach the ₹{MINIMUM_ORDER_AMOUNT} minimum order value.
+            </p>
+          )}
           <button
             onClick={() => router.push("/checkout")}
-            className="btn-primary w-full py-3 mt-5"
+            disabled={belowMinimum}
+            className="btn-primary w-full py-3 mt-5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Proceed to Checkout
+            {belowMinimum ? `Minimum Order ₹${MINIMUM_ORDER_AMOUNT}` : "Proceed to Checkout"}
           </button>
         </div>
       </div>

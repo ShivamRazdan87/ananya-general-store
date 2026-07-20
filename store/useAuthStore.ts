@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { supabase } from "@/lib/supabase";
 
 export interface Address {
   id: string;
@@ -23,127 +23,148 @@ type VerifyResult = Result | { ok: true; isNewUser: true };
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   isLoggedIn: boolean;
   loading: boolean;
   init: () => Promise<void>;
-  sendOtp: (phone: string) => Promise<Result>;
-  verifyOtp: (phone: string, otp: string, name?: string) => Promise<VerifyResult>;
-  logout: () => void;
+  sendOtp: (email: string) => Promise<Result>;
+  verifyOtp: (email: string, otp: string, name?: string) => Promise<VerifyResult>;
+  logout: () => Promise<void>;
   addAddress: (address: Omit<Address, "id">) => Promise<void>;
   removeAddress: (id: string) => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      user: null,
-      token: null,
-      isLoggedIn: false,
-      loading: true,
+async function loadUserData(userId: string, email: string): Promise<User | null> {
+  const [{ data: profile }, { data: addressRows }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+    supabase.from("addresses").select("*").eq("user_id", userId),
+  ]);
 
-      // Called once on app load (see StoreSync). Uses the token persisted
-      // from a previous session (if any) to fetch a fresh copy of the
-      // resident's profile and addresses.
-      init: async () => {
-        const token = get().token;
-        if (!token) {
-          set({ loading: false });
-          return;
-        }
-        try {
-          const res = await fetch("/api/account/me", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await res.json();
-          if (res.ok && data.user) {
-            set({ user: data.user, isLoggedIn: true, loading: false });
-          } else {
-            set({ user: null, token: null, isLoggedIn: false, loading: false });
-          }
-        } catch {
-          set({ loading: false });
-        }
-      },
+  if (!profile || !profile.name) return null;
 
-      sendOtp: async (phone) => {
-        try {
-          const res = await fetch("/api/otp/send", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone }),
-          });
-          const data = await res.json();
-          if (!res.ok) return { ok: false, error: data.error || "Could not send OTP" };
-          return { ok: true };
-        } catch {
-          return { ok: false, error: "Network error. Please try again." };
-        }
-      },
+  return {
+    id: userId,
+    name: profile.name,
+    email,
+    phone: profile.phone || "",
+    addresses: (addressRows || []).map((a: any) => ({
+      id: a.id,
+      label: a.label,
+      pincode: a.pincode,
+      isDefault: a.is_default,
+    })),
+  };
+}
 
-      verifyOtp: async (phone, otp, name) => {
-        try {
-          const res = await fetch("/api/otp/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone, otp, name }),
-          });
-          const data = await res.json();
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
+  isLoggedIn: false,
+  loading: true,
 
-          if (!res.ok) return { ok: false, error: data.error || "Invalid OTP" };
-          if (data.isNewUser) return { ok: true, isNewUser: true };
+  init: async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-          set({ user: data.user, token: data.token, isLoggedIn: true });
-          return { ok: true };
-        } catch {
-          return { ok: false, error: "Network error. Please try again." };
-        }
-      },
-
-      logout: () => {
-        set({ user: null, token: null, isLoggedIn: false });
-      },
-
-      addAddress: async (address) => {
-        const { token, user } = get();
-        if (!token || !user) return;
-        try {
-          const res = await fetch("/api/account/addresses", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify(address),
-          });
-          const data = await res.json();
-          if (res.ok && data.address) {
-            set({ user: { ...user, addresses: [...user.addresses, data.address] } });
-          }
-        } catch {
-          // fetch failure — address just won't appear; caller's toast covers UX
-        }
-      },
-
-      removeAddress: async (id) => {
-        const { token, user } = get();
-        if (!token || !user) return;
-        try {
-          const res = await fetch(`/api/account/addresses/${id}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            set({ user: { ...user, addresses: user.addresses.filter((a) => a.id !== id) } });
-          }
-        } catch {
-          // fetch failure — address stays in list; user can retry
-        }
-      },
-    }),
-    {
-      name: "ananya-auth",
-      // Only the token needs to persist across page loads/tabs. The user
-      // object is re-fetched fresh via init() every time, so it always
-      // reflects the latest name/addresses instead of a stale snapshot.
-      partialize: (state) => ({ token: state.token }),
+    if (session?.user) {
+      const user = await loadUserData(session.user.id, session.user.email || "");
+      set({ user, isLoggedIn: !!user, loading: false });
+    } else {
+      set({ loading: false });
     }
-  )
-);
+
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        set({ user: null, isLoggedIn: false });
+      }
+    });
+  },
+
+  sendOtp: async (email) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { shouldCreateUser: true },
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  },
+
+  verifyOtp: async (email, otp, name) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: otp.trim(),
+      type: "email",
+    });
+    if (error || !data.user) {
+      return { ok: false, error: error?.message || "Invalid or expired OTP" };
+    }
+
+    const userId = data.user.id;
+    const existing = await loadUserData(userId, data.user.email || "");
+
+    if (existing) {
+      set({ user: existing, isLoggedIn: true });
+      return { ok: true };
+    }
+
+    if (!name || !name.trim()) {
+      // Verified, but no profile yet — ask the caller to collect a name
+      // and call verifyOtp again before we consider them logged in.
+      return { ok: true, isNewUser: true };
+    }
+
+    const { error: upsertError } = await supabase
+      .from("profiles")
+      .upsert({ id: userId, name: name.trim() });
+    if (upsertError) {
+      return { ok: false, error: "Could not create your account. Please try again." };
+    }
+
+    set({
+      user: { id: userId, name: name.trim(), email: data.user.email || "", phone: "", addresses: [] },
+      isLoggedIn: true,
+    });
+    return { ok: true };
+  },
+
+  logout: async () => {
+    await supabase.auth.signOut();
+    set({ user: null, isLoggedIn: false });
+  },
+
+  addAddress: async (address) => {
+    const user = get().user;
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("addresses")
+      .insert({
+        user_id: user.id,
+        label: address.label,
+        pincode: address.pincode,
+        is_default: address.isDefault,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      set({
+        user: {
+          ...user,
+          addresses: [
+            ...user.addresses,
+            { id: data.id, label: data.label, pincode: data.pincode, isDefault: data.is_default },
+          ],
+        },
+      });
+    }
+  },
+
+  removeAddress: async (id) => {
+    const user = get().user;
+    if (!user) return;
+    const { error } = await supabase.from("addresses").delete().eq("id", id);
+    if (!error) {
+      set({ user: { ...user, addresses: user.addresses.filter((a) => a.id !== id) } });
+    }
+  },
+}));

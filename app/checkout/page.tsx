@@ -13,6 +13,8 @@ import PaymentModal, { PaymentMethod } from "@/components/PaymentModal";
 import { validateSocietyAddress } from "@/lib/address";
 import { toast } from "sonner";
 
+const MINIMUM_ORDER_AMOUNT = 150;
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, getSubtotal, clearCart } = useCartStore();
@@ -29,8 +31,7 @@ export default function CheckoutPage() {
   const [showPayment, setShowPayment] = useState(false);
 
   const subtotal = getSubtotal();
-  const deliveryFee = subtotal > 199 || subtotal === 0 ? 0 : 25;
-  const total = subtotal + deliveryFee;
+  const total = subtotal;
 
   if (!isLoggedIn) {
     return (
@@ -49,6 +50,20 @@ export default function CheckoutPage() {
         <p className="text-lg font-semibold mb-4">Your cart is empty</p>
         <button onClick={() => router.push("/shop")} className="btn-primary px-6 py-2.5">
           Continue Shopping
+        </button>
+      </div>
+    );
+  }
+
+  if (subtotal < MINIMUM_ORDER_AMOUNT) {
+    return (
+      <div className="container-x py-20 text-center">
+        <p className="text-lg font-semibold mb-2">Minimum order value is ₹{MINIMUM_ORDER_AMOUNT}</p>
+        <p className="text-sm text-gray-500 mb-4">
+          Add ₹{(MINIMUM_ORDER_AMOUNT - subtotal).toFixed(0)} more to your cart to proceed.
+        </p>
+        <button onClick={() => router.push("/cart")} className="btn-primary px-6 py-2.5">
+          Back to Cart
         </button>
       </div>
     );
@@ -73,11 +88,14 @@ export default function CheckoutPage() {
   };
 
   const handlePaymentSuccess = async (method: PaymentMethod) => {
-    const methodLabel = { upi: "UPI", card: "Card", wallet: "Wallet", cod: "Cash on Delivery", razorpay: "Razorpay" }[method];
+    const methodLabel = {
+      cod: "Cash on Delivery",
+      direct_upi: "UPI - Pending Verification",
+    }[method];
     const order = await placeOrder({
       items,
       subtotal,
-      deliveryFee,
+      deliveryFee: 0,
       total,
       paymentMethod: methodLabel,
       address: selectedAddress?.pincode || "",
@@ -195,7 +213,7 @@ export default function CheckoutPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Delivery Fee</span>
-              <span className="font-medium">{deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}</span>
+              <span className="font-medium text-leaf-600">FREE</span>
             </div>
             <div className="border-t pt-2 flex justify-between font-bold text-base">
               <span>Total</span>

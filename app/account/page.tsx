@@ -249,21 +249,19 @@ function AuthForm({
   verifyOtp: (
     email: string,
     otp: string,
-    name?: string,
-    phone?: string
+    name?: string
   ) => Promise<{ ok: boolean; error?: string; isNewUser?: boolean }>;
 }) {
   const [step, setStep] = useState<"email" | "otp" | "details">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      toast.error("Enter your email address");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast.error("Enter a valid email address");
       return;
     }
     setSubmitting(true);
@@ -304,7 +302,7 @@ function AuthForm({
       return;
     }
     setSubmitting(true);
-    const result = await verifyOtp(email.trim(), otp.trim(), name, phone);
+    const result = await verifyOtp(email.trim(), otp.trim(), name.trim());
     setSubmitting(false);
     if (result.ok) {
       toast.success("Account created successfully!");
@@ -328,7 +326,7 @@ function AuthForm({
               ? "Login or register with your email"
               : step === "otp"
               ? `Enter the OTP sent to ${email}`
-              : "Tell us a bit about yourself to finish setting up"}
+              : "Tell us your name to finish setting up"}
           </p>
         </div>
 
@@ -381,12 +379,6 @@ function AuthForm({
               placeholder="Full Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
-            />
-            <input
-              placeholder="Phone Number (optional)"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-saffron-400"
             />
             <button type="submit" disabled={submitting} className="btn-primary w-full py-3 mt-2 disabled:opacity-60">
