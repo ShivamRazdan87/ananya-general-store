@@ -19,7 +19,6 @@ export interface Order {
   pincode: string;
   deliverySlot: string;
   customerEmail: string;
-  customerPhone: string;
   customerName: string;
   createdAt: string;
 }
@@ -47,7 +46,6 @@ function toDbRow(o: Order) {
     pincode: o.pincode,
     delivery_slot: o.deliverySlot,
     customer_email: o.customerEmail,
-    customer_phone: o.customerPhone,
     customer_name: o.customerName,
     created_at: o.createdAt,
   };
@@ -66,7 +64,6 @@ function fromDbRow(row: any): Order {
     pincode: row.pincode,
     deliverySlot: row.delivery_slot,
     customerEmail: row.customer_email,
-    customerPhone: row.customer_phone || "",
     customerName: row.customer_name,
     createdAt: row.created_at,
   };
@@ -85,7 +82,6 @@ const seedOrders: Order[] = [
     pincode: "201308",
     deliverySlot: "ASAP (10 mins)",
     customerEmail: "user@ananya.com",
-    customerPhone: "9876543210",
     customerName: "Ananya Sharma",
     createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
   },
@@ -101,7 +97,6 @@ const seedOrders: Order[] = [
     pincode: "201308",
     deliverySlot: "ASAP (10 mins)",
     customerEmail: "customer2@example.com",
-    customerPhone: "9876500002",
     customerName: "Rahul Verma",
     createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
   },
@@ -117,7 +112,6 @@ const seedOrders: Order[] = [
     pincode: "201308",
     deliverySlot: "ASAP (10 mins)",
     customerEmail: "customer3@example.com",
-    customerPhone: "9876500003",
     customerName: "Priya Nair",
     createdAt: new Date(Date.now() - 1800000).toISOString(),
   },
