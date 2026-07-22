@@ -142,13 +142,14 @@ export default function PaymentModal({ amount, onClose, onSuccess }: PaymentModa
                   <p className="text-sm font-semibold text-gray-700 mb-3">{STORE_UPI_ID}</p>
                   <a
                     href={upiLink}
+                    onClick={() => handlePay()}
                     className="inline-block w-full btn-primary py-2.5 text-sm mb-3"
                   >
-                    Open UPI App to Pay
+                    Open UPI App & Place Order
                   </a>
                   <p className="text-[11px] text-gray-400">
-                    Pays the store directly — no fees. On a phone, tap "Open UPI App" or scan the QR.
-                    After paying, tap "I've Paid" below to place your order.
+                    Pays the store directly — no fees. On a phone, this opens your UPI app to pay ₹{amount.toFixed(2)}
+                    and places your order at the same time.
                   </p>
                 </div>
               )}
@@ -159,9 +160,11 @@ export default function PaymentModal({ amount, onClose, onSuccess }: PaymentModa
                 </div>
               )}
 
-              <button onClick={handlePay} className="w-full btn-primary py-3 text-base">
-                {selected === "direct_upi" ? "I've Paid — Place Order" : `Pay ₹${amount.toFixed(2)}`}
-              </button>
+              {selected === "cod" && (
+                <button onClick={handlePay} className="w-full btn-primary py-3 text-base">
+                  Pay ₹{amount.toFixed(2)}
+                </button>
+              )}
               <p className="text-center text-[11px] text-gray-400 mt-3">
                 {selected === "direct_upi"
                   ? "🔒 Direct UPI transfer — no fees, no middleman"

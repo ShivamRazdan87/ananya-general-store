@@ -64,7 +64,7 @@ function SuccessContent() {
         <MessageCircle size={18} /> Confirm order with shop on WhatsApp
       </button>
       <p className="text-xs text-gray-400 mt-2">
-        Tap this so the shop sees your order right away and starts preparing it.
+        It's mandatory to press "Confirm order with shop" so the order can be delivered to you on time.
       </p>
 
       <div className="flex gap-3 mt-6 w-full">
