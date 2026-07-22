@@ -13,17 +13,19 @@ const steps: { status: OrderStatus; label: string; icon: any }[] = [
   { status: "Delivered", label: "Delivered", icon: Home },
 ];
 
+const DELIVERY_WINDOW_MINUTES = 10;
+
 export default function TrackOrderPage() {
   const params = useParams();
   const orderId = params.id as string;
   const order = useOrderStore((s) => s.getOrderById(orderId));
-  const [progress, setProgress] = useState(0);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    // Simulate live progress advancing for demo purposes
-    const timer = setInterval(() => {
-      setProgress((p) => (p < 3 ? p + 1 : p));
-    }, 4000);
+    // Re-check elapsed time every 10 seconds so the progress bar advances
+    // in step with the real 10-minute delivery window, instead of a fake
+    // fixed-interval animation unrelated to when the order was placed.
+    const timer = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(timer);
   }, []);
 
@@ -38,9 +40,18 @@ export default function TrackOrderPage() {
     );
   }
 
+  // Splits the 10-minute delivery window evenly across the 4 stages:
+  // Confirmed (instant) -> Preparing -> Out for Delivery -> Delivered.
+  const elapsedMinutes = (now - new Date(order.createdAt).getTime()) / 60000;
+  const stageLength = DELIVERY_WINDOW_MINUTES / 3;
+  let timeBasedIndex = 0;
+  if (elapsedMinutes >= stageLength * 2) timeBasedIndex = 3;
+  else if (elapsedMinutes >= stageLength) timeBasedIndex = 2;
+  else timeBasedIndex = 1;
+
   const stepIndex = Math.max(
     steps.findIndex((s) => s.status === order.status),
-    progress
+    timeBasedIndex
   );
 
   return (
@@ -50,7 +61,16 @@ export default function TrackOrderPage() {
 
       <div className="card p-6 mb-6">
         <div className="flex items-center gap-2 bg-saffron-50 text-saffron-700 rounded-xl px-4 py-3 mb-8 text-sm font-medium">
-          <Clock size={18} /> Estimated delivery: 10 minutes from order confirmation
+          <Clock size={18} />
+          {order.status === "Delivered"
+            ? "Delivered"
+            : order.status === "Cancelled"
+            ? "Order cancelled"
+            : elapsedMinutes < DELIVERY_WINDOW_MINUTES
+            ? `Arriving in about ${Math.max(1, Math.ceil(DELIVERY_WINDOW_MINUTES - elapsedMinutes))} minute${
+                Math.ceil(DELIVERY_WINDOW_MINUTES - elapsedMinutes) === 1 ? "" : "s"
+              }`
+            : "Running a little behind — your order is still on its way"}
         </div>
 
         <div className="relative">

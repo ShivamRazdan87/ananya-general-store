@@ -145,9 +145,21 @@ export const useOrderStore = create<OrderState>()(
       },
 
       placeOrder: async (orderData) => {
+        // Order number reflects the actual total number of orders placed
+        // to date (not a random ID), so it's a real running count.
+        let orderNumber = get().orders.length + 1;
+        if (isSupabaseConfigured) {
+          const { count, error } = await supabase
+            .from("orders")
+            .select("id", { count: "exact", head: true });
+          if (!error && typeof count === "number") {
+            orderNumber = count + 1;
+          }
+        }
+
         const newOrder: Order = {
           ...orderData,
-          id: `ORD-${Math.floor(10000 + Math.random() * 89999)}`,
+          id: `ORD-${orderNumber}`,
           status: "Confirmed",
           createdAt: new Date().toISOString(),
         };
